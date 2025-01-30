@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker } from '../types';
 import SpeakerList from '../components/SpeakerList';
 import TimeInput from '../components/TimeInput';
-import { Plus, Calendar, Clock, Image, ArrowLeft, Coffee } from 'lucide-react';
+import { Plus, Calendar, Clock, Image, ArrowLeft, Coffee, Video, List, ListFilter } from 'lucide-react';
 import { addMinutesToTime } from '../utils/timeUtils';
 import DisplayView from './DisplayView';
 
@@ -25,46 +25,72 @@ const defaultBackgroundOptions = [
 function AdminView() {
   const [conference, setConference] = useState<Conference>(() => {
     const saved = localStorage.getItem('conference');
-    return saved ? JSON.parse(saved) : {
-      id: '1',
-      name: 'כנס טבת התשפ"ה',
-      date: '2025-01-20',
-      startTime: '09:00',
-      speakers: [
-        {
-          id: crypto.randomUUID(),
-          name: 'מציג ראשון',
-          topic: 'נושא ראשון',
-          duration: 30,
-          order: 0,
-          logo: 'aka.png'
+    if (!saved) {
+      // Return default conference structure
+      const defaultConference: Conference = {
+        id: crypto.randomUUID(),
+        name: '',
+        startTime: '09:00',
+        speakers: [],
+        currentSpeakerId: null,
+        theme: {
+          background: 'bg-gradient-to-r from-blue-900 to-blue-700',
+          font: 'font-sans',
+          backgroundImage: defaultBackgroundOptions[0].url
         },
-        {
-          id: crypto.randomUUID(),
-          name: 'מציג שני',
-          topic: 'נושא שני',
-          duration: 30,
-          order: 1,
-          logo: 'IDF.png'
-        }
-      ],
-      currentSpeakerId: null,
-      theme: {
-        background: 'bg-gradient-to-r from-blue-900 to-blue-700',
-        font: 'font-sans',
-        backgroundImage: defaultBackgroundOptions[0].url
-      },
-      customBackgrounds: []
-    };
+        customBackgrounds: [],
+        warningTime: 120,
+        showUpcomingOnly: true
+      };
+      localStorage.setItem('conference', JSON.stringify(defaultConference));
+      return defaultConference;
+    }
+
+    try {
+      const parsed = JSON.parse(saved);
+      // Ensure the conference has the correct structure
+      if (!parsed.speakers) {
+        parsed.speakers = [];
+      }
+      return parsed;
+    } catch (error) {
+      console.error('Error parsing conference data:', error);
+      // Return default conference structure on error
+      const defaultConference: Conference = {
+        id: crypto.randomUUID(),
+        name: '',
+        startTime: '09:00',
+        speakers: [],
+        currentSpeakerId: null,
+        theme: {
+          background: 'bg-gradient-to-r from-blue-900 to-blue-700',
+          font: 'font-sans',
+          backgroundImage: defaultBackgroundOptions[0].url
+        },
+        customBackgrounds: [],
+        warningTime: 120,
+        showUpcomingOnly: true
+      };
+      localStorage.setItem('conference', JSON.stringify(defaultConference));
+      return defaultConference;
+    }
   });
 
   const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
 
+  // Save conference data immediately when it changes
   useEffect(() => {
-    localStorage.setItem('conference', JSON.stringify(conference));
-    window.dispatchEvent(new Event('storage'));
+    try {
+      localStorage.setItem('conference', JSON.stringify(conference));
+      window.dispatchEvent(new Event('storage'));
+      setSaveStatus('saved');
+    } catch (error) {
+      console.error('Error saving conference:', error);
+      setSaveStatus('error');
+    }
   }, [conference]);
 
   const calculateStartTime = (index: number): string => {
@@ -85,6 +111,7 @@ function AdminView() {
       duration: isBreak ? 15 : 30,
       isBreak,
       order: conference.speakers.length,
+      bio: isBreak ? undefined : '',
     };
     
     const updatedSpeakers = [...conference.speakers, newSpeaker].map((speaker, index) => ({
@@ -144,6 +171,32 @@ function AdminView() {
     }));
   };
 
+  const handleSetCurrentSpeaker = (speakerId: string) => {
+    setConference(prev => ({
+      ...prev,
+      currentSpeakerId: speakerId
+    }));
+  };
+
+  const handleDuplicateSpeaker = (speaker: Speaker) => {
+    const newSpeaker: Speaker = {
+      ...speaker,
+      id: crypto.randomUUID(),
+      name: `${speaker.name} (עותק)`,
+      order: conference.speakers.length
+    };
+    
+    const updatedSpeakers = [...conference.speakers, newSpeaker].map((s, index) => ({
+      ...s,
+      startTime: calculateStartTime(index)
+    }));
+
+    setConference(prev => ({
+      ...prev,
+      speakers: updatedSpeakers
+    }));
+  };
+
   const handleBackgroundChange = (url: string) => {
     setConference(prev => ({
       ...prev,
@@ -178,17 +231,20 @@ function AdminView() {
     }
   };
 
-  const handleSetCurrentSpeaker = (speakerId: string) => {
-    setConference(prev => ({
-      ...prev,
-      currentSpeakerId: speakerId
-    }));
-  };
-
   const saveConference = () => {
     try {
       // Get existing conferences
       const conferences = JSON.parse(localStorage.getItem('conferences') || '[]');
+      
+      // Check for duplicate names
+      const hasDuplicateName = conferences.some((conf: Conference) => 
+        conf.id !== conference.id && conf.name === conference.name
+      );
+      
+      if (hasDuplicateName) {
+        alert('קיים כבר כנס עם שם זהה. אנא בחר שם אחר.');
+        return;
+      }
       
       // Find if this conference already exists
       const existingIndex = conferences.findIndex((conf: Conference) => conf.id === conference.id);
@@ -219,6 +275,24 @@ function AdminView() {
     }
   };
 
+  const createNewConference = () => {
+    setConference({
+      id: crypto.randomUUID(),
+      name: '',
+      startTime: '09:00',
+      speakers: [],
+      currentSpeakerId: null,
+      theme: {
+        background: 'bg-gradient-to-r from-blue-900 to-blue-700',
+        font: 'font-sans',
+        backgroundImage: defaultBackgroundOptions[0].url
+      },
+      customBackgrounds: [],
+      warningTime: 120,
+      showUpcomingOnly: true
+    });
+  };
+
   const loadConference = (conferenceId: string) => {
     try {
       const conferences = JSON.parse(localStorage.getItem('conferences') || '[]');
@@ -237,21 +311,7 @@ function AdminView() {
     const updatedConferences = conferences.filter((conf: Conference) => conf.id !== conference.id);
     localStorage.setItem('conferences', JSON.stringify(updatedConferences));
     setShowDeleteWarning(false);
-    // Reset to a new conference
-    setConference({
-      id: crypto.randomUUID(),
-      name: '',
-      date: new Date().toISOString().split('T')[0],
-      startTime: '09:00',
-      speakers: [],
-      currentSpeakerId: null,
-      theme: {
-        background: 'bg-gradient-to-r from-blue-900 to-blue-700',
-        font: 'font-sans',
-        backgroundImage: defaultBackgroundOptions[0].url
-      },
-      customBackgrounds: []
-    });
+    createNewConference();
   };
 
   return (
@@ -276,12 +336,21 @@ function AdminView() {
         <header className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-4xl font-bold">ניהול הכנס</h1>
-            <button
-              onClick={() => setShowDeleteWarning(true)}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              מחק כנס
-            </button>
+            <div className="flex space-x-4">
+              <Link
+                to="/admin/before-conference"
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+              >
+                <Video size={20} />
+                <span>מסך לפני הכנס</span>
+              </Link>
+              <button
+                onClick={() => setShowDeleteWarning(true)}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                מחק כנס
+              </button>
+            </div>
           </div>
           <div className="flex space-x-4">
             <input
@@ -291,46 +360,60 @@ function AdminView() {
               className="bg-white/10 rounded px-4 py-2 flex-grow"
               placeholder="שם הכנס"
             />
-            <div className="relative flex">
-              <input
-                type="date"
-                value={conference.date}
-                onChange={(e) => setConference(prev => ({ ...prev, date: e.target.value }))}
-                className="bg-white/10 rounded px-4 py-2"
-              />
-              <button
-                onClick={() => setConference(prev => ({ 
-                  ...prev, 
-                  date: new Date().toISOString().split('T')[0] 
-                }))}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                title="Set to today"
-              >
-                <Calendar size={20} />
-              </button>
-            </div>
+            
             <TimeInput
               value={conference.startTime}
               onChange={(newStartTime) => {
-                const updatedSpeakers = conference.speakers.map((speaker, index) => ({
-                  ...speaker,
-                  startTime: calculateStartTime(index)
-                }));
                 setConference(prev => ({
                   ...prev,
                   startTime: newStartTime,
-                  speakers: updatedSpeakers
+                  speakers: prev.speakers.map((speaker, index) => ({
+                    ...speaker,
+                    startTime: calculateStartTime(index)
+                  }))
                 }));
               }}
               className="bg-white/10 rounded px-4 py-2"
             />
+
+            <div className="flex items-center space-x-2 bg-white/10 rounded px-4 py-2">
+              <label className="text-white">התראה לפני סיום (שניות):</label>
+              <input
+                type="number"
+                min="0"
+                max="600"
+                value={conference.warningTime || 120}
+                onChange={(e) => setConference(prev => ({
+                  ...prev,
+                  warningTime: Math.max(0, Math.min(600, parseInt(e.target.value) || 120))
+                }))}
+                className="bg-white/10 rounded px-2 py-1 w-20 text-center"
+              />
+            </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section className="bg-black/50 backdrop-blur-lg rounded-xl p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold">מציגים</h2>
+        <div className="grid grid-cols-2 gap-8">
+          <section className="bg-black/50 backdrop-blur-lg rounded-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-4">
+                <h2 className="text-2xl font-semibold">מציגים</h2>
+                <button
+                  onClick={() => {
+                    setConference(prev => ({
+                      ...prev,
+                      showUpcomingOnly: !prev.showUpcomingOnly
+                    }));
+                  }}
+                  className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors ${
+                    conference.showUpcomingOnly ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-500 hover:bg-gray-600'
+                  }`}
+                  title={conference.showUpcomingOnly ? "הצג את כל המציגים" : "הצג רק מציגים הבאים"}
+                >
+                  {conference.showUpcomingOnly ? <ListFilter size={18} /> : <List size={18} />}
+                  <span>{conference.showUpcomingOnly ? "מציגים הבאים" : "כל המציגים"}</span>
+                </button>
+              </div>
               <div className="flex space-x-2">
                 <button
                   onClick={() => setShowBackgroundModal(true)}
@@ -355,6 +438,7 @@ function AdminView() {
                 </button>
               </div>
             </div>
+
             <SpeakerList
               speakers={conference.speakers}
               currentSpeakerId={conference.currentSpeakerId}
@@ -362,6 +446,8 @@ function AdminView() {
               onDelete={handleDeleteSpeaker}
               onReorder={handleReorderSpeakers}
               onSetCurrent={handleSetCurrentSpeaker}
+              onDuplicate={handleDuplicateSpeaker}
+              showUpcomingOnly={conference.showUpcomingOnly}
             />
           </section>
 
@@ -374,6 +460,12 @@ function AdminView() {
         </div>
 
         <div className="mt-8 flex items-center space-x-4">
+          <button
+            onClick={createNewConference}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-heebo"
+          >
+            כנס חדש
+          </button>
           <select
             onChange={(e) => loadConference(e.target.value)}
             className="bg-white/10 rounded px-4 py-2 font-heebo text-white"
@@ -496,6 +588,10 @@ function AdminView() {
           </div>
         </div>
       )}
+
+      <div className="disclaimer-admin">
+        נבנה ועוצב על ידי נועם שדמי
+      </div>
     </div>
   );
 }

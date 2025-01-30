@@ -7,12 +7,12 @@ export interface Speaker {
   startTime?: string; // Format: "HH:mm"
   logo?: string;
   order: number;
+  bio?: string;
 }
 
 export interface Conference {
   id: string;
   name: string;
-  date: string;
   startTime: string; // Format: "HH:mm"
   speakers: Speaker[];
   currentSpeakerId: string | null;
@@ -25,6 +25,8 @@ export interface Conference {
     name: string;
     url: string;
   }[];
+  warningTime: number; // Time in seconds before end to show warning
+  showUpcomingOnly: boolean; // Whether to show only upcoming speakers
 }
 
 export interface Timer {
