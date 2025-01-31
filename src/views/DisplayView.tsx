@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker, Timer } from '../types';
 import { SpeakerInfo, TimeRange } from '../types/SpeakerInfo';
-import { Calendar, Clock, Settings, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Calendar, Clock, Settings, ArrowLeft } from 'lucide-react';
 import { 
   getCurrentSpeakerInfo, 
   addMinutesToTime, 
@@ -233,20 +233,37 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     const nextSpeakerIndex = currentSpeakerIndex + 1;
     console.log("handleManualNextSpeaker - Current index:", currentSpeakerIndex, "Next index:", nextSpeakerIndex);
 
-    // Adjust current speaker's duration based on actual time spent
+    // Get current time rounded down to the nearest minute
+    const now = new Date();
+    now.setSeconds(0, 0); // Round down to nearest minute
+    const currentTimeStr = now.toLocaleTimeString('he-IL', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
+
+    // Calculate elapsed time for current speaker
     const speakerStartTime = speakerTimes.find(st => st.id === currentSpeaker.id)?.startTime;
     if (speakerStartTime) {
       const startTimeDate = parseTime(speakerStartTime);
-      const now = new Date();
       const elapsedTimeMinutes = Math.ceil((now.getTime() - startTimeDate.getTime()) / (1000 * 60));
       console.log("handleManualNextSpeaker - Adjusting duration from", currentSpeaker.duration, "to", elapsedTimeMinutes);
 
-      // Update the current speaker's duration
-      const updatedSpeakers = conference.speakers.map(s => {
-        if (s.id === currentSpeaker.id) {
+      // Update all speakers' times based on the current transition
+      const updatedSpeakers = conference.speakers.map((s, index) => {
+        if (index < currentSpeakerIndex) {
+          // Previous speakers remain unchanged
+          return s;
+        } else if (index === currentSpeakerIndex) {
+          // Current speaker: update duration to elapsed time
           return { ...s, duration: elapsedTimeMinutes };
+        } else if (index === nextSpeakerIndex) {
+          // Next speaker: will start now
+          return { ...s, startTime: currentTimeStr };
+        } else {
+          // Future speakers: will be recalculated based on the new times
+          return s;
         }
-        return s;
       });
 
       if (nextSpeakerIndex < conference.speakers.length) {
@@ -259,6 +276,10 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         setConference(updatedConference);
         localStorage.setItem('conference', JSON.stringify(updatedConference));
         window.dispatchEvent(new Event('storage'));
+
+        // Immediately recalculate speaker times
+        const newTimes = calculateSpeakerTimes(updatedSpeakers, conference.startTime);
+        setSpeakerTimes(newTimes);
       } else {
         console.log("handleManualNextSpeaker - No more speakers, ending conference");
         const updatedConference = {
@@ -273,7 +294,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     }
   }, [conference, speakerTimes]);
 
-  // Function to go back to the previous speaker
+  // Function to manually proceed to the previous speaker
   const handlePreviousSpeaker = useCallback(() => {
     console.log("handlePreviousSpeaker CALLED, mode:", conference?.mode);
     if (!conference || conference.mode !== 'manual') {
@@ -294,20 +315,22 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       setConference(updatedConference);
       localStorage.setItem('conference', JSON.stringify(updatedConference));
       window.dispatchEvent(new Event('storage'));
+    } else {
+      console.log("handlePreviousSpeaker - Already at first speaker");
     }
   }, [conference]);
 
-  // Keyboard shortcuts for manual mode navigation
+  // Keyboard shortcuts for manual mode (next and previous)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (conference?.mode === 'manual') {
         if (event.ctrlKey && event.shiftKey) {
           if (event.key.toLowerCase() === 'p') {
-            console.log("Next Speaker keyboard shortcut TRIGGERED");
+            console.log("Next speaker keyboard shortcut TRIGGERED");
             event.preventDefault();
             handleManualNextSpeaker();
           } else if (event.key.toLowerCase() === 'b') {
-            console.log("Previous Speaker keyboard shortcut TRIGGERED");
+            console.log("Previous speaker keyboard shortcut TRIGGERED");
             event.preventDefault();
             handlePreviousSpeaker();
           }
@@ -775,25 +798,29 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
       </div>
 
-      {/* Manual Mode Navigation Buttons */}
+      {/* Manual Mode Buttons */}
       {conference?.mode === 'manual' && !hasConferenceEnded && (
-        <div className="fixed bottom-16 left-4 flex gap-2">
+        <div className="fixed bottom-16 left-4 flex flex-col gap-2 z-50">
+          {/* Previous Speaker Button */}
           <button
             onClick={() => {
               console.log("Previous Speaker button CLICKED");
               handlePreviousSpeaker();
             }}
-            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors z-50 flex items-center gap-2 text-lg font-medium"
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 text-lg font-medium"
+            style={{ transform: 'scaleX(-1)' }} // Flip the arrow horizontally
           >
-            <ArrowRight size={20} />
-            <span>מציג קודם</span>
+            <ArrowLeft size={20} />
+            <span style={{ transform: 'scaleX(-1)' }}>מציג קודם</span>
           </button>
+          
+          {/* Next Speaker Button */}
           <button
             onClick={() => {
               console.log("Next Speaker button CLICKED");
               handleManualNextSpeaker();
             }}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors z-50 flex items-center gap-2 text-lg font-medium"
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-lg font-medium"
           >
             <span>מציג הבא</span>
             <ArrowLeft size={20} />
