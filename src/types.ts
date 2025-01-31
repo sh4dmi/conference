@@ -27,6 +27,7 @@ export interface Conference {
   }[];
   warningTime: number; // Time in seconds before end to show warning
   showUpcomingOnly: boolean; // Whether to show only upcoming speakers
+  mode: 'automatic' | 'manual';
 }
 
 export interface Timer {

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker, Timer } from '../types';
 import { SpeakerInfo, TimeRange } from '../types/SpeakerInfo';
-import { Calendar, Clock, Settings } from 'lucide-react';
+import { Calendar, Clock, Settings, ArrowLeft, ArrowRight } from 'lucide-react';
 import { 
   getCurrentSpeakerInfo, 
   addMinutesToTime, 
@@ -147,7 +147,18 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       duration: speaker.duration
     };
 
-    const status = getTimeStatus(timeRangeObj);
+    // In manual mode, a speaker is only considered finished if they're before the current speaker
+    const status = conference.mode === 'manual' 
+      ? (() => {
+          const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+          const thisIndex = conference.speakers.findIndex(s => s.id === speaker.id);
+          if (currentIndex === -1) return 'upcoming';
+          if (thisIndex < currentIndex) return 'finished';
+          if (thisIndex === currentIndex) return 'current';
+          return 'upcoming';
+        })()
+      : getTimeStatus(timeRangeObj);
+
     const timeLeftMs = getTimeLeftForSpeaker(speaker);
     const isWarning = status === 'current' && timeLeftMs <= (conference.warningTime || 120) * 1000;
 
@@ -163,16 +174,171 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     };
   }, [currentTime, conference, speakerTimes, getTimeLeftForSpeaker]);
 
+  // Function to handle automatic progression to the next speaker
+  const handleAutomaticNextSpeaker = useCallback(() => {
+    console.log("handleAutomaticNextSpeaker CALLED, mode:", conference?.mode);
+    if (!conference || conference.mode !== 'automatic') {
+      console.log("handleAutomaticNextSpeaker - Not in automatic mode, returning");
+      return;
+    }
+
+    const currentSpeakerIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+    const nextSpeakerIndex = currentSpeakerIndex + 1;
+    console.log("handleAutomaticNextSpeaker - Current index:", currentSpeakerIndex, "Next index:", nextSpeakerIndex);
+
+    if (nextSpeakerIndex < conference.speakers.length) {
+      const updatedConference = {
+        ...conference,
+        currentSpeakerId: conference.speakers[nextSpeakerIndex].id
+      };
+      console.log("handleAutomaticNextSpeaker - Advancing to next speaker:", updatedConference.currentSpeakerId);
+      setConference(updatedConference);
+      localStorage.setItem('conference', JSON.stringify(updatedConference));
+      window.dispatchEvent(new Event('storage'));
+    } else {
+      console.log("handleAutomaticNextSpeaker - No more speakers, ending conference");
+      const updatedConference = {
+        ...conference,
+        currentSpeakerId: null
+      };
+      setConference(updatedConference);
+      localStorage.setItem('conference', JSON.stringify(updatedConference));
+      window.dispatchEvent(new Event('storage'));
+    }
+  }, [conference]);
+
+  // Function to manually proceed to the next speaker
+  const handleManualNextSpeaker = useCallback(() => {
+    console.log("handleManualNextSpeaker CALLED, mode:", conference?.mode);
+    if (!conference || conference.mode !== 'manual') {
+      console.log("handleManualNextSpeaker - Not in manual mode, returning");
+      return;
+    }
+
+    // If no current speaker is set, set it to the first speaker
+    if (!conference.currentSpeakerId && conference.speakers.length > 0) {
+      console.log("handleManualNextSpeaker - No current speaker, setting to first speaker");
+      const updatedConference = {
+        ...conference,
+        currentSpeakerId: conference.speakers[0].id
+      };
+      setConference(updatedConference);
+      localStorage.setItem('conference', JSON.stringify(updatedConference));
+      window.dispatchEvent(new Event('storage'));
+      return;
+    }
+
+    const currentSpeakerIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+    const currentSpeaker = conference.speakers[currentSpeakerIndex];
+    const nextSpeakerIndex = currentSpeakerIndex + 1;
+    console.log("handleManualNextSpeaker - Current index:", currentSpeakerIndex, "Next index:", nextSpeakerIndex);
+
+    // Adjust current speaker's duration based on actual time spent
+    const speakerStartTime = speakerTimes.find(st => st.id === currentSpeaker.id)?.startTime;
+    if (speakerStartTime) {
+      const startTimeDate = parseTime(speakerStartTime);
+      const now = new Date();
+      const elapsedTimeMinutes = Math.ceil((now.getTime() - startTimeDate.getTime()) / (1000 * 60));
+      console.log("handleManualNextSpeaker - Adjusting duration from", currentSpeaker.duration, "to", elapsedTimeMinutes);
+
+      // Update the current speaker's duration
+      const updatedSpeakers = conference.speakers.map(s => {
+        if (s.id === currentSpeaker.id) {
+          return { ...s, duration: elapsedTimeMinutes };
+        }
+        return s;
+      });
+
+      if (nextSpeakerIndex < conference.speakers.length) {
+        console.log("handleManualNextSpeaker - Advancing to next speaker");
+        const updatedConference = {
+          ...conference,
+          speakers: updatedSpeakers,
+          currentSpeakerId: conference.speakers[nextSpeakerIndex].id
+        };
+        setConference(updatedConference);
+        localStorage.setItem('conference', JSON.stringify(updatedConference));
+        window.dispatchEvent(new Event('storage'));
+      } else {
+        console.log("handleManualNextSpeaker - No more speakers, ending conference");
+        const updatedConference = {
+          ...conference,
+          speakers: updatedSpeakers,
+          currentSpeakerId: null
+        };
+        setConference(updatedConference);
+        localStorage.setItem('conference', JSON.stringify(updatedConference));
+        window.dispatchEvent(new Event('storage'));
+      }
+    }
+  }, [conference, speakerTimes]);
+
+  // Function to go back to the previous speaker
+  const handlePreviousSpeaker = useCallback(() => {
+    console.log("handlePreviousSpeaker CALLED, mode:", conference?.mode);
+    if (!conference || conference.mode !== 'manual') {
+      console.log("handlePreviousSpeaker - Not in manual mode, returning");
+      return;
+    }
+
+    const currentSpeakerIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+    const previousSpeakerIndex = currentSpeakerIndex - 1;
+    console.log("handlePreviousSpeaker - Current index:", currentSpeakerIndex, "Previous index:", previousSpeakerIndex);
+
+    if (previousSpeakerIndex >= 0) {
+      console.log("handlePreviousSpeaker - Going back to previous speaker");
+      const updatedConference = {
+        ...conference,
+        currentSpeakerId: conference.speakers[previousSpeakerIndex].id
+      };
+      setConference(updatedConference);
+      localStorage.setItem('conference', JSON.stringify(updatedConference));
+      window.dispatchEvent(new Event('storage'));
+    }
+  }, [conference]);
+
+  // Keyboard shortcuts for manual mode navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (conference?.mode === 'manual') {
+        if (event.ctrlKey && event.shiftKey) {
+          if (event.key.toLowerCase() === 'p') {
+            console.log("Next Speaker keyboard shortcut TRIGGERED");
+            event.preventDefault();
+            handleManualNextSpeaker();
+          } else if (event.key.toLowerCase() === 'b') {
+            console.log("Previous Speaker keyboard shortcut TRIGGERED");
+            event.preventDefault();
+            handlePreviousSpeaker();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [conference?.mode, handleManualNextSpeaker, handlePreviousSpeaker]);
+
   // Update timer for current speaker
   useEffect(() => {
+    console.log("Timer useEffect RUNNING, mode:", conference?.mode);
     if (!conference?.currentSpeakerId) return;
     
     const currentSpeaker = conference.speakers.find(s => s.id === conference.currentSpeakerId);
     if (!currentSpeaker) return;
     
     const timeLeft = getTimeLeftForSpeaker(currentSpeaker);
+    console.log("Timer useEffect - Time left:", timeLeft, "ms");
+    
     if (timeLeft <= 0) {
       setTimer(prev => ({ ...prev, isRunning: false }));
+      // Only switch to next speaker automatically if in automatic mode
+      if (conference.mode === 'automatic') {
+        console.log("Timer useEffect - Time up, triggering automatic next speaker");
+        handleAutomaticNextSpeaker();
+      } else {
+        console.log("Timer useEffect - Time up, but in manual mode, not advancing");
+      }
       return;
     }
 
@@ -185,7 +351,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       seconds,
       isRunning: true
     }));
-  }, [currentTime, getTimeLeftForSpeaker, conference]);
+  }, [currentTime, getTimeLeftForSpeaker, conference, handleAutomaticNextSpeaker]);
 
   // Update the displayedSpeakers logic to properly handle showUpcomingOnly
   const displayedSpeakers = React.useMemo(() => {
@@ -608,6 +774,32 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       <div className="fixed bottom-4 right-4 text-sm text-white/50">
         כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
       </div>
+
+      {/* Manual Mode Navigation Buttons */}
+      {conference?.mode === 'manual' && !hasConferenceEnded && (
+        <div className="fixed bottom-16 left-4 flex gap-2">
+          <button
+            onClick={() => {
+              console.log("Previous Speaker button CLICKED");
+              handlePreviousSpeaker();
+            }}
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors z-50 flex items-center gap-2 text-lg font-medium"
+          >
+            <ArrowRight size={20} />
+            <span>מציג קודם</span>
+          </button>
+          <button
+            onClick={() => {
+              console.log("Next Speaker button CLICKED");
+              handleManualNextSpeaker();
+            }}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors z-50 flex items-center gap-2 text-lg font-medium"
+          >
+            <span>מציג הבא</span>
+            <ArrowLeft size={20} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

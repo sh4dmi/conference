@@ -40,7 +40,8 @@ function AdminView() {
         },
         customBackgrounds: [],
         warningTime: 120,
-        showUpcomingOnly: true
+        showUpcomingOnly: true,
+        mode: 'automatic'
       };
       localStorage.setItem('conference', JSON.stringify(defaultConference));
       return defaultConference;
@@ -69,7 +70,8 @@ function AdminView() {
         },
         customBackgrounds: [],
         warningTime: 120,
-        showUpcomingOnly: true
+        showUpcomingOnly: true,
+        mode: 'automatic'
       };
       localStorage.setItem('conference', JSON.stringify(defaultConference));
       return defaultConference;
@@ -289,7 +291,8 @@ function AdminView() {
       },
       customBackgrounds: [],
       warningTime: 120,
-      showUpcomingOnly: true
+      showUpcomingOnly: true,
+      mode: 'automatic'
     });
   };
 
@@ -336,7 +339,7 @@ function AdminView() {
         <header className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-4xl font-bold">ניהול הכנס</h1>
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 items-center">
               <Link
                 to="/admin/before-conference"
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
@@ -350,6 +353,17 @@ function AdminView() {
               >
                 מחק כנס
               </button>
+              <div className="flex items-center space-x-2">
+                <label className="text-white">מצב:</label>
+                <select
+                  value={conference.mode}
+                  onChange={(e) => setConference(prev => ({ ...prev, mode: e.target.value as 'automatic' | 'manual' }))}
+                  className="bg-white/10 rounded px-2 py-1 text-white"
+                >
+                  <option value="automatic" className="text-black">אוטומטי</option>
+                  <option value="manual" className="text-black">ידני</option>
+                </select>
+              </div>
             </div>
           </div>
           <div className="flex space-x-4">
@@ -445,7 +459,6 @@ function AdminView() {
               onEdit={handleEditSpeaker}
               onDelete={handleDeleteSpeaker}
               onReorder={handleReorderSpeakers}
-              onSetCurrent={handleSetCurrentSpeaker}
               onDuplicate={handleDuplicateSpeaker}
               showUpcomingOnly={conference.showUpcomingOnly}
             />
