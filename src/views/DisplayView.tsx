@@ -521,6 +521,26 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     return Math.min(100, Math.max(0, progress));
   }, [conference?.speakers, currentTime, speakerTimes, getTimeLeftForSpeaker]);
 
+  // Add this function at the top with other utility functions
+  const getTotalRemainingConferenceTime = useCallback((speakers: Speaker[], currentSpeakerId: string | null): number => {
+    if (!speakers.length) return 0;
+    
+    const currentSpeakerIndex = speakers.findIndex(s => s.id === currentSpeakerId);
+    if (currentSpeakerIndex === -1) return 0;
+
+    // Calculate remaining time for current speaker
+    const currentSpeaker = speakers[currentSpeakerIndex];
+    const currentTimeLeft = getTimeLeftForSpeaker(currentSpeaker);
+    const currentMinutesLeft = Math.floor(currentTimeLeft / 60000);
+
+    // Add remaining time for all upcoming speakers
+    const remainingTime = speakers
+      .slice(currentSpeakerIndex + 1)
+      .reduce((acc, speaker) => acc + speaker.duration, 0);
+
+    return currentMinutesLeft + remainingTime;
+  }, [getTimeLeftForSpeaker]);
+
   if (!conference) {
     if (isPreview) return null;
     return (
@@ -558,9 +578,11 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       {/* Fixed Logos - Enhanced with shadows */}
       <div className="fixed top-24 left-8 flex items-center space-x-8 z-50">
         <img src="/logos/aka.png" alt="AKA Logo" 
-          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-lg p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
+          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
         <img src="/logos/IDF.png" alt="IDF Logo" 
-          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-lg p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
+          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
+        <img src="/logos/tikshuv.png" alt="Tikshuv Logo" 
+          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
       </div>
 
       {/* Admin Link */}
@@ -787,7 +809,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
               ? 'תודה שהשתתפתם בכנס'
               : displayedSpeakers[0].isUpcoming 
                 ? `הכנס יתחיל בעוד ${displayedSpeakers[0].timeLeft} דקות` 
-                : `נותרו ${displayedSpeakers[0].timeLeft} דקות להרצאה הנוכחית`
+                : `נותרו ${getTotalRemainingConferenceTime(conference.speakers, conference.currentSpeakerId)} דקות עד סוף הכנס`
             : ''
           }
         </p>
