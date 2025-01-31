@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker, Timer } from '../types';
 import { SpeakerInfo, TimeRange } from '../types/SpeakerInfo';
@@ -111,6 +111,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         speaker,
         timeRange: '',
         timeLeft: 0,
+        elapsedTime: 0,
         isWarning: false,
         isUpcoming: false,
         isFinished: true,
@@ -129,6 +130,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         speaker,
         timeRange: '',
         timeLeft: 0,
+        elapsedTime: 0,
         isWarning: false,
         isUpcoming: false,
         isFinished: true,
@@ -160,12 +162,20 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       : getTimeStatus(timeRangeObj);
 
     const timeLeftMs = getTimeLeftForSpeaker(speaker);
+    const timeLeft = Math.floor(timeLeftMs / 60000);
     const isWarning = status === 'current' && timeLeftMs <= (conference.warningTime || 120) * 1000;
+
+    // Calculate elapsed time based on start time and current time
+    const startTimeDate = parseTime(speakerTime.startTime);
+    const now = new Date();
+    const elapsedTimeMs = now.getTime() - startTimeDate.getTime();
+    const elapsedTime = Math.max(0, Math.ceil(elapsedTimeMs / (1000 * 60)));
 
     return {
       speaker,
       timeRange: `${timeRangeObj.startTime}-${timeRangeObj.endTime}`,
-      timeLeft: Math.floor(timeLeftMs / 60000),
+      timeLeft,
+      elapsedTime,
       isWarning,
       isUpcoming: status === 'upcoming',
       isFinished: status === 'finished',
@@ -561,294 +571,320 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
   }
 
   return (
-    <div className={`min-h-screen text-white relative ${scaleClass}`}
-      style={{
-        backgroundImage: `
-          linear-gradient(
-            rgba(0, 0, 0, 0.8),
-            rgba(0, 0, 0, 0.85)
-          ),
-          url(${conference.theme.backgroundImage})
-        `,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-        ...(isPreview ? { width: '400%', height: '400%', transformOrigin: 'top left' } : {})
-      }}>
-      {/* Fixed Logos - Enhanced with shadows */}
-      <div className="fixed top-24 left-8 flex items-center space-x-8 z-50">
-        <img src="/logos/aka.png" alt="AKA Logo" 
-          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
-        <img src="/logos/IDF.png" alt="IDF Logo" 
-          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
-        <img src="/logos/tikshuv.png" alt="Tikshuv Logo" 
-          className="h-48 w-48 object-contain bg-white/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/50 border border-white/10 transition-all duration-300 hover:border-white/20" />
-      </div>
-
-      {/* Admin Link */}
-      <Link to="/admin" 
-        className="fixed bottom-4 left-4 p-2 bg-black/30 hover:bg-black/50 rounded-full transition-colors z-50"
-        title="Admin Panel">
-        <Settings size={24} />
-      </Link>
-
-      <div className="container mx-auto px-4 py-8 pl-12">
-        {/* Clock and Date Section - Top Right */}
-        <div className="fixed top-8 right-8 flex flex-col gap-4 z-40">
-          {/* Clock Display */}
-          <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-            <div className="text-8xl font-bold font-mono tracking-wider">
-              {currentTime.toLocaleTimeString('he-IL', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-              })}
-            </div>
+    <div className="min-h-screen text-white relative overflow-hidden flex flex-col">
+      {/* Background wrapper */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: `url(${conference.theme.backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          filter: 'brightness(0.4)'
+        }}
+      />
+      
+      {/* Content wrapper */}
+      <div className={`relative z-10 flex-1 flex flex-col ${scaleClass}`}
+        style={isPreview ? { width: '400%', height: '400%', transformOrigin: 'top left' } : undefined}>
+        
+        {/* Main content area */}
+        <div className="flex-1">
+          {/* Fixed Logos - Enhanced with shadows */}
+          <div className="fixed top-24 left-8 flex items-center space-x-8 z-50">
+            <img src="/logos/aka.png" alt="AKA Logo" 
+              className="h-48 w-48 object-contain bg-black/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/20 transition-all duration-300 hover:bg-black/20" />
+            <img src="/logos/IDF.png" alt="IDF Logo" 
+              className="h-48 w-48 object-contain bg-black/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/20 transition-all duration-300 hover:bg-black/20" />
+            <img src="/logos/tikshuv.png" alt="Tikshuv Logo" 
+              className="h-48 w-48 object-contain bg-black/10 backdrop-blur-sm rounded-full p-4 shadow-lg shadow-black/20 transition-all duration-300 hover:bg-black/20" />
           </div>
 
-          {/* Date Display - One Line */}
-          <div className="bg-black/20 backdrop-blur-sm rounded-2xl px-6 py-4 border border-white/10">
-            <div className="flex items-center justify-end gap-4 text-2xl">
-              <div className="flex items-center gap-3 text-blue-200">
-                <Calendar size={24} className="text-blue-300" />
-                <span>{currentTime.getFullYear()}</span>
-                <span>ב{currentTime.toLocaleDateString('he-IL', { month: 'long' })}</span>
-                <span className="font-bold">{currentTime.getDate()}</span>
-                <span className="font-medium">יום {['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][currentTime.getDay()]}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+          {/* Admin Link */}
+          <Link to="/admin" 
+            className="fixed bottom-4 left-4 p-2 bg-black/30 hover:bg-black/50 rounded-full transition-colors z-50"
+            title="Admin Panel">
+            <Settings size={24} />
+          </Link>
 
-        {/* Speakers List */}
-        <div className="fixed top-80 right-8 w-96 z-40">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-3xl font-bold text-white flex items-center">
-              <Clock className="ml-2" size={24} />
-              {conference.showUpcomingOnly ? 'מציגים הבאים' : 'כל המציגים'}
-            </h2>
-          </div>
-          <div className="space-y-3 overflow-y-auto pr-1 pl-4 relative max-h-[50vh]"
-            style={{ 
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'rgba(255,255,255,0.3) transparent'
-            }}>
-            {/* Timeline with gradient - Only show when not in upcoming mode */}
-            {!conference.showUpcomingOnly && (
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-700/30 rounded-full overflow-hidden">
-                <div 
-                  className="w-full bg-gradient-to-b from-blue-400 to-blue-600 transition-all duration-1000 rounded-full"
-                  style={{ 
-                    height: `${conferenceProgress}%`,
-                    maxHeight: '100%'
-                  }} 
-                />
-              </div>
-            )}
-            
-            {/* Updated speaker cards with better contrast and glow effect for current speaker */}
-            {displayedSpeakers.map((speakerInfo: SpeakerInfo) => {
-              if (!speakerInfo.speaker) return null;
-              const isCurrent = !speakerInfo.isFinished && !speakerInfo.isUpcoming;
-              return (
-                <div
-                  key={speakerInfo.speaker.id}
-                  className={`relative bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-500 ${
-                    isCurrent
-                      ? 'ring-2 ring-blue-400 bg-blue-900/20 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-pulse-slow border border-blue-400/50'
-                      : 'hover:bg-white/20'
-                  }`}
-                >
-                  <div className={`space-y-2 ${isCurrent ? 'relative z-10' : ''}`}>
-                    <div className="flex items-center gap-3">
-                      {speakerInfo.speaker.logo && (
-                        <img src={`/logos/${speakerInfo.speaker.logo}`}
-                          alt={`${speakerInfo.speaker.name} logo`}
-                          className={`w-12 h-12 object-contain rounded-full bg-white/20 p-1 ${
-                            isCurrent ? 'ring-1 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''
-                          }`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className={`text-lg font-bold truncate ${
-                          isCurrent ? 'text-blue-100 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-white'
-                        }`}>{speakerInfo.speaker.name}</h3>
-                        {speakerInfo.speaker.bio && (
-                          <p className="text-sm text-gray-200 truncate italic">{speakerInfo.speaker.bio}</p>
-                        )}
-                        <p className={`text-sm truncate ${
-                          isCurrent ? 'text-blue-300' : 'text-blue-200'
-                        }`}>{speakerInfo.speaker.topic}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className={`text-sm font-mono font-semibold ${
-                        isCurrent ? 'text-blue-100' : 'text-blue-100'
-                      }`}>{speakerInfo.timeRange}</span>
-                    </div>
-                  </div>
-                  {isCurrent && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-400/10 rounded-xl" />
-                  )}
+          <div className="container mx-auto px-4 py-8 pl-12">
+            {/* Clock and Date Section - Top Right */}
+            <div className="fixed top-8 right-8 flex flex-col gap-4 z-40">
+              {/* Clock Display */}
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                <div className="text-8xl font-bold font-mono tracking-wider">
+                  {currentTime.toLocaleTimeString('he-IL', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Date Display - One Line */}
+              <div className="bg-black/20 backdrop-blur-sm rounded-2xl px-6 py-4 border border-white/10">
+                <div className="flex items-center justify-end gap-4 text-2xl">
+                  <div className="flex items-center gap-3 text-blue-200">
+                    <Calendar size={24} className="text-blue-300" />
+                    <span>{currentTime.getFullYear()}</span>
+                    <span>ב{currentTime.toLocaleDateString('he-IL', { month: 'long' })}</span>
+                    <span className="font-bold">{currentTime.getDate()}</span>
+                    <span className="font-medium">יום {['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][currentTime.getDay()]}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Speakers List */}
+            <div className="fixed top-80 right-8 w-96 z-40">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-3xl font-bold text-white flex items-center">
+                  <Clock className="ml-2" size={24} />
+                  {conference.showUpcomingOnly ? 'מציגים הבאים' : 'כל המציגים'}
+                </h2>
+              </div>
+              <div className="space-y-3 overflow-y-auto pr-1 pl-4 relative max-h-[50vh]"
+                style={{ 
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(255,255,255,0.3) transparent'
+                }}>
+                {/* Timeline with gradient - Only show when not in upcoming mode */}
+                {!conference.showUpcomingOnly && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-700/30 rounded-full overflow-hidden">
+                    <div 
+                      className="w-full bg-gradient-to-b from-blue-400 to-blue-600 transition-all duration-1000 rounded-full"
+                      style={{ 
+                        height: `${conferenceProgress}%`,
+                        maxHeight: '100%'
+                      }} 
+                    />
+                  </div>
+                )}
+                
+                {/* Updated speaker cards with better contrast and glow effect for current speaker */}
+                {displayedSpeakers.map((speakerInfo: SpeakerInfo) => {
+                  if (!speakerInfo.speaker) return null;
+                  const isCurrent = !speakerInfo.isFinished && !speakerInfo.isUpcoming;
+                  return (
+                    <div
+                      key={speakerInfo.speaker.id}
+                      className={`relative bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-500 ${
+                        isCurrent
+                          ? 'ring-2 ring-blue-400 bg-blue-900/20 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-pulse-slow border border-blue-400/50'
+                          : 'hover:bg-white/20'
+                      }`}
+                    >
+                      <div className={`space-y-2 ${isCurrent ? 'relative z-10' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          {speakerInfo.speaker.logo && (
+                            <img src={`/logos/${speakerInfo.speaker.logo}`}
+                              alt={`${speakerInfo.speaker.name} logo`}
+                              className={`w-12 h-12 object-contain rounded-full bg-white/20 p-1 ${
+                                isCurrent ? 'ring-1 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''
+                              }`} />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className={`text-lg font-bold truncate ${
+                              isCurrent ? 'text-blue-100 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-white'
+                            }`}>{speakerInfo.speaker.name}</h3>
+                            {speakerInfo.speaker.bio && (
+                              <p className="text-sm text-gray-200 truncate italic">{speakerInfo.speaker.bio}</p>
+                            )}
+                            <p className={`text-sm truncate ${
+                              isCurrent ? 'text-blue-300' : 'text-blue-200'
+                            }`}>{speakerInfo.speaker.topic}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-sm font-mono font-semibold ${
+                            isCurrent ? 'text-blue-100' : 'text-blue-100'
+                          }`}>{speakerInfo.timeRange}</span>
+                        </div>
+                      </div>
+                      {isCurrent && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-400/10 rounded-xl" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Main Content - Moved down */}
+            <div className="flex flex-col items-center pt-32">
+              <h1 className="text-7xl font-bold mb-16 bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text">
+                {conference.name}
+              </h1>
+
+              {/* Current Speaker Card - Enhanced typography and spacing */}
+              {displayedSpeakers.length > 0 && (
+                <div className="w-[80%] max-w-6xl">
+                  <h2 className="text-5xl font-bold mb-8 text-white flex items-center tracking-wide">
+                    <div className="w-5 h-5 rounded-full bg-green-400 animate-pulse mr-3" />
+                    {hasConferenceEnded 
+                      ? 'הכנס הסתיים'
+                      : (() => {
+                        const currentSpeaker = displayedSpeakers.find(s => !s.isFinished && !s.isUpcoming);
+                        if (currentSpeaker) return 'מציג נוכחי';
+                        const nextSpeaker = displayedSpeakers.find(s => s.isUpcoming);
+                        if (nextSpeaker) return 'המציג הבא';
+                        return 'הכנס הסתיים';
+                      })()
+                    }
+                  </h2>
+                  {(() => {
+                    const currentSpeaker = displayedSpeakers.find(s => !s.isFinished && !s.isUpcoming);
+                    const nextSpeaker = displayedSpeakers.find(s => s.isUpcoming);
+                    const speakerToShow = currentSpeaker || nextSpeaker || displayedSpeakers[displayedSpeakers.length - 1];
+                    
+                    if (!speakerToShow?.speaker) return null;
+                    
+                    return (
+                      <div className={`p-16 rounded-2xl transition-all duration-500 backdrop-blur-sm shadow-2xl ${
+                        speakerToShow.isWarning
+                          ? 'bg-red-900/30 border-2 border-red-400 animate-pulse'
+                          : speakerToShow.speaker.isBreak 
+                            ? 'bg-green-900/30 border border-green-400'
+                            : 'bg-white/10 border border-white/20'
+                      }`}>
+                        <div className="flex items-center gap-12">
+                          {speakerToShow.speaker.logo && (
+                            <img src={`/logos/${speakerToShow.speaker.logo}`}
+                              alt={`${speakerToShow.speaker.name} logo`}
+                              className="w-52 h-52 object-contain rounded-2xl bg-white/10 p-4 shadow-lg shadow-black/50 border border-white/10" />
+                          )}
+                          <div className="flex-1">
+                            <h2 className="text-8xl font-bold mb-8 tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200 drop-shadow-lg">
+                              {speakerToShow.speaker.name}
+                            </h2>
+                            {speakerToShow.speaker.bio && (
+                              <p className="text-3xl text-gray-300 mb-8 leading-relaxed font-light">
+                                {speakerToShow.speaker.bio}
+                              </p>
+                            )}
+                            <p className="text-5xl text-blue-200 mb-10 font-medium tracking-wide">
+                              {speakerToShow.speaker.topic}
+                            </p>
+                            <div className="flex items-center gap-8">
+                              <span className="text-4xl font-mono text-blue-100 font-semibold tracking-wider">
+                                {speakerToShow.timeRange}
+                              </span>
+                              {speakerToShow.timeLeft && !speakerToShow.isFinished && (
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <p className={`text-2xl tracking-wide ${
+                                      speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-gray-300'
+                                    }`}>
+                                      {speakerToShow.timeLeft !== undefined
+                                        ? speakerToShow.isUpcoming 
+                                          ? `מתחיל בעוד ${speakerToShow.timeLeft} דקות`
+                                          : (() => {
+                                              const now = new Date();
+                                              const endTimeStr = speakerToShow.timeRangeObj?.endTime;
+                                              if (!endTimeStr) return '';
+                                              
+                                              const [hours, minutes] = endTimeStr.split(':').map(Number);
+                                              const endTime = new Date();
+                                              endTime.setHours(hours, minutes, 0, 0);
+                                              
+                                              if (now > endTime) {
+                                                const diffMs = now.getTime() - endTime.getTime();
+                                                const diffMinutes = Math.ceil(diffMs / (1000 * 60));
+                                                return `הזמן חלף ב-${diffMinutes} דק`;
+                                              }
+                                              
+                                              return `נותרו ${speakerToShow.timeLeft} דקות`;
+                                            })()
+                                        : ''
+                                      }
+                                    </p>
+                                    {!speakerToShow.isUpcoming && (
+                                      <p className="text-2xl text-blue-300">
+                                        {Math.floor((speakerToShow.speaker.duration - Math.max(speakerToShow.timeLeft, 0)) / 1)} דקות חלפו
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="w-full h-3 bg-black/50 rounded-full overflow-hidden shadow-inner">
+                                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000"
+                                      style={{ 
+                                        width: `${((speakerToShow.speaker.duration - Math.max(speakerToShow.timeLeft, 0)) / speakerToShow.speaker.duration) * 100}%`
+                                      }} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            {!speakerToShow.isUpcoming && !speakerToShow.isFinished && (
+                              <button
+                                onClick={() => handleShortenSpeakerTime(speakerToShow.speaker)}
+                                className="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors flex items-center gap-2 text-lg"
+                              >
+                                <Clock size={20} />
+                                קיצור זמן מציג
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Main Content - Moved down */}
-        <div className="flex flex-col items-center pt-32">
-          <h1 className="text-7xl font-bold mb-16 bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text">
-            {conference.name}
-          </h1>
-
-          {/* Current Speaker Card - Enhanced typography and spacing */}
-          {displayedSpeakers.length > 0 && (
-            <div className="w-[80%] max-w-6xl">
-              <h2 className="text-5xl font-bold mb-8 text-white flex items-center tracking-wide">
-                <div className="w-5 h-5 rounded-full bg-green-400 animate-pulse mr-3" />
-                {hasConferenceEnded 
-                  ? 'הכנס הסתיים'
-                  : (() => {
-                    const currentSpeaker = displayedSpeakers.find(s => !s.isFinished && !s.isUpcoming);
-                    if (currentSpeaker) return 'מציג נוכחי';
-                    const nextSpeaker = displayedSpeakers.find(s => s.isUpcoming);
-                    if (nextSpeaker) return 'המציג הבא';
-                    return 'הכנס הסתיים';
-                  })()
-                }
-              </h2>
-              {(() => {
-                const currentSpeaker = displayedSpeakers.find(s => !s.isFinished && !s.isUpcoming);
-                const nextSpeaker = displayedSpeakers.find(s => s.isUpcoming);
-                const speakerToShow = currentSpeaker || nextSpeaker || displayedSpeakers[displayedSpeakers.length - 1];
-                
-                if (!speakerToShow?.speaker) return null;
-                
-                return (
-                  <div className={`p-16 rounded-2xl transition-all duration-500 backdrop-blur-sm shadow-2xl ${
-                    speakerToShow.isWarning
-                      ? 'bg-red-900/30 border-2 border-red-400 animate-pulse'
-                      : speakerToShow.speaker.isBreak 
-                        ? 'bg-green-900/30 border border-green-400'
-                        : 'bg-white/10 border border-white/20'
-                  }`}>
-                    <div className="flex items-center gap-12">
-                      {speakerToShow.speaker.logo && (
-                        <img src={`/logos/${speakerToShow.speaker.logo}`}
-                          alt={`${speakerToShow.speaker.name} logo`}
-                          className="w-52 h-52 object-contain rounded-2xl bg-white/10 p-4 shadow-lg shadow-black/50 border border-white/10" />
-                      )}
-                      <div className="flex-1">
-                        <h2 className="text-8xl font-bold mb-8 tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200 drop-shadow-lg">
-                          {speakerToShow.speaker.name}
-                        </h2>
-                        {speakerToShow.speaker.bio && (
-                          <p className="text-3xl text-gray-300 mb-8 leading-relaxed font-light">
-                            {speakerToShow.speaker.bio}
-                          </p>
-                        )}
-                        <p className="text-5xl text-blue-200 mb-10 font-medium tracking-wide">
-                          {speakerToShow.speaker.topic}
-                        </p>
-                        <div className="flex items-center gap-8">
-                          <span className="text-4xl font-mono text-blue-100 font-semibold tracking-wider">
-                            {speakerToShow.timeRange}
-                          </span>
-                          {speakerToShow.timeLeft && !speakerToShow.isFinished && (
-                            <div className="flex-1">
-                              <div className="flex justify-between items-center mb-3">
-                                <p className={`text-2xl tracking-wide ${
-                                  speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-gray-300'
-                                }`}>
-                                  {speakerToShow.timeLeft !== undefined
-                                    ? speakerToShow.isUpcoming 
-                                      ? `מתחיל בעוד ${speakerToShow.timeLeft} דקות`
-                                      : `נותרו ${speakerToShow.timeLeft} דקות`
-                                    : ''
-                                  }
-                                </p>
-                                {!speakerToShow.isUpcoming && (
-                                  <p className="text-2xl text-blue-300">
-                                    {Math.floor((speakerToShow.speaker.duration - speakerToShow.timeLeft) / 1)} דקות חלפו
-                                  </p>
-                                )}
-                              </div>
-                              <div className="w-full h-3 bg-black/50 rounded-full overflow-hidden shadow-inner">
-                                <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000"
-                                  style={{ 
-                                    width: `${((speakerToShow.speaker.duration - speakerToShow.timeLeft) / speakerToShow.speaker.duration) * 100}%`
-                                  }} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        {!speakerToShow.isUpcoming && !speakerToShow.isFinished && (
-                          <button
-                            onClick={() => handleShortenSpeakerTime(speakerToShow.speaker)}
-                            className="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors flex items-center gap-2 text-lg"
-                          >
-                            <Clock size={20} />
-                            קיצור זמן מציג
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
+        {/* Footer section with ticker and disclaimer */}
+        <div className="mt-auto">
+          {/* Ticker Bar */}
+          <div className="bg-black/30 backdrop-blur-[8px] p-3 text-center">
+            <p className="text-lg text-blue-200">
+              {displayedSpeakers.length > 0 && displayedSpeakers[0].timeLeft !== undefined
+                ? hasConferenceEnded
+                  ? 'תודה שהשתתפתם בכנס'
+                  : displayedSpeakers[0].isUpcoming 
+                    ? `הכנס יתחיל בעוד ${displayedSpeakers[0].timeLeft} דקות` 
+                    : `נותרו ${getTotalRemainingConferenceTime(conference.speakers, conference.currentSpeakerId)} דקות עד סוף הכנס`
+                : ''
+              }
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Ticker Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/30 backdrop-blur-sm border-t border-white/10 p-3 text-center">
-        <p className="text-lg text-blue-200">
-          {displayedSpeakers.length > 0 && displayedSpeakers[0].timeLeft !== undefined
-            ? hasConferenceEnded
-              ? 'תודה שהשתתפתם בכנס'
-              : displayedSpeakers[0].isUpcoming 
-                ? `הכנס יתחיל בעוד ${displayedSpeakers[0].timeLeft} דקות` 
-                : `נותרו ${getTotalRemainingConferenceTime(conference.speakers, conference.currentSpeakerId)} דקות עד סוף הכנס`
-            : ''
-          }
-        </p>
-      </div>
-
-      {/* Disclaimer */}
-      <div className="fixed bottom-4 right-4 text-sm text-white/50">
-        כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
-      </div>
-
-      {/* Manual Mode Buttons */}
-      {conference?.mode === 'manual' && !hasConferenceEnded && (
-        <div className="fixed bottom-16 left-4 flex flex-col gap-2 z-50">
-          {/* Previous Speaker Button */}
-          <button
-            onClick={() => {
-              console.log("Previous Speaker button CLICKED");
-              handlePreviousSpeaker();
-            }}
-            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 text-lg font-medium"
-            style={{ transform: 'scaleX(-1)' }} // Flip the arrow horizontally
-          >
-            <ArrowLeft size={20} />
-            <span style={{ transform: 'scaleX(-1)' }}>מציג קודם</span>
-          </button>
-          
-          {/* Next Speaker Button */}
-          <button
-            onClick={() => {
-              console.log("Next Speaker button CLICKED");
-              handleManualNextSpeaker();
-            }}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-lg font-medium"
-          >
-            <span>מציג הבא</span>
-            <ArrowLeft size={20} />
-          </button>
+        {/* Disclaimer */}
+        <div className="absolute bottom-4 right-4 text-sm text-white/50 z-50">
+          כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
         </div>
-      )}
+
+        {/* Manual Mode Buttons */}
+        {conference?.mode === 'manual' && !hasConferenceEnded && (
+          <div className="fixed bottom-16 left-4 flex flex-col gap-2 z-50">
+            {/* Previous Speaker Button */}
+            <button
+              onClick={() => {
+                console.log("Previous Speaker button CLICKED");
+                handlePreviousSpeaker();
+              }}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 text-lg font-medium"
+              style={{ transform: 'scaleX(-1)' }} // Flip the arrow horizontally
+            >
+              <ArrowLeft size={20} />
+              <span style={{ transform: 'scaleX(-1)' }}>מציג קודם</span>
+            </button>
+            
+            {/* Next Speaker Button */}
+            <button
+              onClick={() => {
+                console.log("Next Speaker button CLICKED");
+                handleManualNextSpeaker();
+              }}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-lg font-medium"
+            >
+              <span>מציג הבא</span>
+              <ArrowLeft size={20} />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

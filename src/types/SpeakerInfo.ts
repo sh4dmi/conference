@@ -14,6 +14,7 @@ export interface SpeakerInfo {
   speaker: Speaker | undefined;
   timeRange: string;
   timeLeft: number;
+  elapsedTime: number;
   isWarning: boolean;
   isUpcoming: boolean;
   isFinished: boolean;

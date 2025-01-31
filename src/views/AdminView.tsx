@@ -210,26 +210,61 @@ function AdminView() {
     setShowBackgroundModal(false);
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const newBackground = {
-          name: file.name,
-          url: reader.result as string
-        };
-        setConference(prev => ({
-          ...prev,
-          customBackgrounds: [...prev.customBackgrounds, newBackground],
-          theme: {
-            ...prev.theme,
-            backgroundImage: reader.result as string
+      try {
+        // Create a unique filename
+        const timestamp = Date.now();
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const fileName = `${timestamp}-${safeFileName}`;
+        
+        // Convert file to base64 for saving
+        const reader = new FileReader();
+        
+        reader.onloadend = async () => {
+          try {
+            // Save the file to public/backgrounds
+            const response = await fetch('/api/save-background', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fileName,
+                imageData: reader.result
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to save image');
+            }
+
+            // Update conference with the new background path
+            const backgroundPath = `/backgrounds/${fileName}`;
+            setConference(prev => ({
+              ...prev,
+              customBackgrounds: [...prev.customBackgrounds, {
+                name: file.name,
+                url: backgroundPath
+              }],
+              theme: {
+                ...prev.theme,
+                backgroundImage: backgroundPath
+              }
+            }));
+            setShowBackgroundModal(false);
+          } catch (error) {
+            console.error('Error saving image:', error);
+            alert('שגיאה בשמירת התמונה. נא לנסות שוב.');
           }
-        }));
-        setShowBackgroundModal(false);
-      };
-      reader.readAsDataURL(file);
+        };
+        
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error processing image:', error);
+        alert('שגיאה בעיבוד התמונה. נא לנסות שוב.');
+      }
     }
   };
 
@@ -237,20 +272,20 @@ function AdminView() {
     try {
       // Get existing conferences
       const conferences = JSON.parse(localStorage.getItem('conferences') || '[]');
-      
+        
       // Check for duplicate names
       const hasDuplicateName = conferences.some((conf: Conference) => 
         conf.id !== conference.id && conf.name === conference.name
       );
-      
+
       if (hasDuplicateName) {
         alert('קיים כבר כנס עם שם זהה. אנא בחר שם אחר.');
         return;
-      }
-      
+    }
+
       // Find if this conference already exists
       const existingIndex = conferences.findIndex((conf: Conference) => conf.id === conference.id);
-      
+
       let updatedConferences;
       if (existingIndex !== -1) {
         // Update existing conference
@@ -264,7 +299,7 @@ function AdminView() {
 
       try {
         localStorage.setItem('conferences', JSON.stringify(updatedConferences));
-        alert('הכנס נשמר בהצלחה');
+          alert('הכנס נשמר בהצלחה');
       } catch (storageError) {
         // If storage is full, try to save only the current conference
         console.warn('Storage quota exceeded, saving only current conference');
@@ -321,7 +356,7 @@ function AdminView() {
     <div 
       className="min-h-screen text-white relative"
       style={{
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)), url(${conference.theme.backgroundImage})`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.6)), url(${conference.theme.backgroundImage})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
@@ -329,7 +364,7 @@ function AdminView() {
     >
       <Link 
         to="/" 
-        className="fixed top-4 left-4 flex items-center space-x-2 px-4 py-2 bg-black/30 hover:bg-black/50 rounded-lg transition-colors z-50"
+        className="fixed top-4 left-4 flex items-center space-x-2 px-4 py-2 bg-black/20 hover:bg-black/30 rounded-lg transition-colors z-50"
       >
         <ArrowLeft size={20} />
         <span>חזרה לתצוגה</span>
@@ -342,14 +377,14 @@ function AdminView() {
             <div className="flex space-x-4 items-center">
               <Link
                 to="/admin/before-conference"
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+                className="px-4 py-2 bg-purple-500/80 text-white rounded-lg hover:bg-purple-600/80 transition-colors flex items-center space-x-2"
               >
                 <Video size={20} />
                 <span>מסך לפני הכנס</span>
               </Link>
               <button
                 onClick={() => setShowDeleteWarning(true)}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                className="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-600/80 transition-colors"
               >
                 מחק כנס
               </button>
@@ -371,7 +406,7 @@ function AdminView() {
               type="text"
               value={conference.name}
               onChange={(e) => setConference(prev => ({ ...prev, name: e.target.value }))}
-              className="bg-white/10 rounded px-4 py-2 flex-grow"
+              className="bg-black/20 rounded px-4 py-2 flex-grow"
               placeholder="שם הכנס"
             />
             
@@ -387,10 +422,10 @@ function AdminView() {
                   }))
                 }));
               }}
-              className="bg-white/10 rounded px-4 py-2"
+              className="bg-black/20 rounded px-4 py-2"
             />
 
-            <div className="flex items-center space-x-2 bg-white/10 rounded px-4 py-2">
+            <div className="flex items-center space-x-2 bg-black/20 rounded px-4 py-2">
               <label className="text-white">התראה לפני סיום (שניות):</label>
               <input
                 type="number"
@@ -401,14 +436,14 @@ function AdminView() {
                   ...prev,
                   warningTime: Math.max(0, Math.min(600, parseInt(e.target.value) || 120))
                 }))}
-                className="bg-white/10 rounded px-2 py-1 w-20 text-center"
+                className="bg-black/20 rounded px-2 py-1 w-20 text-center"
               />
             </div>
           </div>
         </header>
 
         <div className="grid grid-cols-2 gap-8">
-          <section className="bg-black/50 backdrop-blur-lg rounded-xl p-6">
+          <section className="bg-black/30 backdrop-blur-sm rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
               <div className="flex items-center space-x-4">
                 <h2 className="text-2xl font-semibold">מציגים</h2>
@@ -420,7 +455,7 @@ function AdminView() {
                     }));
                   }}
                   className={`flex items-center space-x-2 px-3 py-1 rounded-lg transition-colors ${
-                    conference.showUpcomingOnly ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-500 hover:bg-gray-600'
+                    conference.showUpcomingOnly ? 'bg-blue-500/80 hover:bg-blue-600/80' : 'bg-gray-500/80 hover:bg-gray-600/80'
                   }`}
                   title={conference.showUpcomingOnly ? "הצג את כל המציגים" : "הצג רק מציגים הבאים"}
                 >
