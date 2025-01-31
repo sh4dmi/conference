@@ -251,6 +251,28 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
 
   }, [conference, speakerTimes]);
 
+  // Add keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Check if Ctrl+Shift+P is pressed
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'p') {
+        event.preventDefault(); // Prevent default browser behavior
+        
+        // Find current speaker
+        const currentSpeaker = displayedSpeakers.find(info => 
+          !info.isFinished && !info.isUpcoming
+        );
+        
+        if (currentSpeaker?.speaker) {
+          handleShortenSpeakerTime(currentSpeaker.speaker);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [displayedSpeakers, handleShortenSpeakerTime]);
+
   // Function to check if conference has ended
   const hasConferenceEnded = React.useMemo(() => {
     if (!conference?.speakers?.length) return false;
