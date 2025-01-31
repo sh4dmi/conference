@@ -216,6 +216,41 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     return speakerInfos;
   }, [conference?.speakers, conference?.showUpcomingOnly, getSpeakerInfo]);
 
+  // Function to shorten current speaker's time
+  const handleShortenSpeakerTime = useCallback((speaker: Speaker | undefined) => {
+    if (!conference || !speaker) return;
+
+    const speakerStartTime = speakerTimes.find(st => st.id === speaker.id)?.startTime;
+    if (!speakerStartTime) return;
+
+    const startTimeDate = parseTime(speakerStartTime);
+    const now = new Date();
+    const elapsedTimeMinutes = Math.ceil((now.getTime() - startTimeDate.getTime()) / (1000 * 60));
+    // Set duration to elapsed time minus 1 minute
+    const newDuration = Math.max(1, elapsedTimeMinutes - 1);
+
+    const updatedSpeakers = conference.speakers.map(s => {
+      if (s.id === speaker.id) {
+        return { ...s, duration: newDuration };
+      }
+      return s;
+    });
+
+    // Calculate new speaker times immediately
+    const newSpeakerTimes = calculateSpeakerTimes(updatedSpeakers, conference.startTime);
+
+    const updatedConference = {
+      ...conference,
+      speakers: updatedSpeakers
+    };
+
+    // Update both state and localStorage synchronously
+    localStorage.setItem('conference', JSON.stringify(updatedConference));
+    setConference(updatedConference);
+    setSpeakerTimes(newSpeakerTimes);
+
+  }, [conference, speakerTimes]);
+
   // Function to check if conference has ended
   const hasConferenceEnded = React.useMemo(() => {
     if (!conference?.speakers?.length) return false;
@@ -514,6 +549,15 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                             </div>
                           )}
                         </div>
+                        {!speakerToShow.isUpcoming && !speakerToShow.isFinished && (
+                          <button
+                            onClick={() => handleShortenSpeakerTime(speakerToShow.speaker)}
+                            className="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors flex items-center gap-2 text-lg"
+                          >
+                            <Clock size={20} />
+                            קיצור זמן מציג
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
