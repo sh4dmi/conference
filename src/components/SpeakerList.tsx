@@ -10,6 +10,7 @@ interface SpeakerListProps {
   onDelete: (id: string) => void;
   onReorder: (startIndex: number, endIndex: number) => void;
   onDuplicate: (speaker: Speaker) => void;
+  onSetCurrentSpeaker: (id: string) => void;
   showUpcomingOnly: boolean;
 }
 
@@ -20,6 +21,7 @@ export default function SpeakerList({
   onDelete, 
   onReorder,
   onDuplicate,
+  onSetCurrentSpeaker,
   showUpcomingOnly
 }: SpeakerListProps) {
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
@@ -110,7 +112,9 @@ export default function SpeakerList({
             draggable
             onDragStart={() => handleDragStart(index)}
             onDragOver={(e) => handleDragOver(e, index)}
-            className={`flex items-center space-x-4 p-4 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow relative ${
+            onClick={() => onSetCurrentSpeaker(speaker.id)}
+            className={`flex items-center space-x-4 p-4 backdrop-blur-sm rounded-lg shadow-sm hover:shadow-md transition-shadow relative cursor-pointer ${
+              speaker.id === currentSpeakerId ? 'ring-2 ring-blue-500 bg-blue-500/30' : 
               status === 'current' ? 'bg-blue-500/30' : 
               speaker.isBreak ? 'bg-green-500/30' : 
               status === 'past' ? 'bg-gray-700/30' : 'bg-white/10'

@@ -339,6 +339,11 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
   const handleAddMinute = useCallback(() => {
     if (!conference?.currentSpeakerId) return;
     
+    // Get the current speaker
+    const currentSpeaker = conference.speakers.find(s => s.id === conference.currentSpeakerId);
+    if (!currentSpeaker) return;
+
+    // Update the speakers array with the new duration
     const updatedSpeakers = conference.speakers.map(speaker => {
       if (speaker.id === conference.currentSpeakerId) {
         return { ...speaker, duration: speaker.duration + 1 };
@@ -346,14 +351,20 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       return speaker;
     });
 
+    // Update the conference with new speakers array
     const updatedConference = {
       ...conference,
       speakers: updatedSpeakers
     };
 
+    // Update state and localStorage
     setConference(updatedConference);
     localStorage.setItem('conference', JSON.stringify(updatedConference));
     window.dispatchEvent(new Event('storage'));
+
+    // Immediately recalculate speaker times
+    const newTimes = calculateSpeakerTimes(updatedSpeakers, conference.startTime);
+    setSpeakerTimes(newTimes);
   }, [conference]);
 
   // Keyboard shortcuts for manual mode (next and previous)
@@ -365,6 +376,8 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
           event.preventDefault();
           if (conference?.mode === 'manual') {
             handleManualNextSpeaker();
+          } else {
+            handleAutomaticNextSpeaker();
           }
         } else if (event.key.toLowerCase() === 'b') {
           console.log("Previous speaker keyboard shortcut TRIGGERED");
@@ -384,7 +397,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [conference?.mode, handleManualNextSpeaker, handlePreviousSpeaker, handleAddMinute, conference?.currentSpeakerId]);
+  }, [conference?.mode, handleManualNextSpeaker, handlePreviousSpeaker, handleAddMinute, conference?.currentSpeakerId, handleAutomaticNextSpeaker]);
 
   // Update timer for current speaker
   useEffect(() => {

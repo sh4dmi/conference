@@ -20,6 +20,10 @@ const defaultBackgroundOptions = [
   {
     name: 'Digital Network',
     url: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&q=80'
+  },
+  {
+    name: 'Hi-Tech Design 2',
+    url: '/public/backgrounds/hi-tech-bg-design2.jpg'
   }
 ];
 
@@ -444,19 +448,19 @@ function AdminView() {
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-4xl font-bold">ניהול הכנס</h1>
             <div className="flex space-x-4 items-center">
-              <Link
-                to="/admin/before-conference"
+                <Link
+                  to="/admin/before-conference"
                 className="px-4 py-2 bg-purple-500/80 text-white rounded-lg hover:bg-purple-600/80 transition-colors flex items-center space-x-2"
-              >
-                <Video size={20} />
-                <span>מסך לפני הכנס</span>
-              </Link>
-              <button
-                onClick={() => setShowDeleteWarning(true)}
+                >
+                  <Video size={20} />
+                  <span>מסך לפני הכנס</span>
+                </Link>
+                <button
+                  onClick={() => setShowDeleteWarning(true)}
                 className="px-4 py-2 bg-red-500/80 text-white rounded-lg hover:bg-red-600/80 transition-colors"
-              >
+                >
                 מחק כנס
-              </button>
+                </button>
               <div className="flex items-center space-x-2">
                 <label className="text-white">מצב:</label>
                 <select
