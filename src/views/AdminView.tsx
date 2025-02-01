@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker } from '../types';
-import SpeakerList from '../components/SpeakerList';
-import TimeInput from '../components/TimeInput';
+import { TimeRange } from '../types/SpeakerInfo';
 import { Plus, Calendar, Clock, Image, ArrowLeft, Coffee, Video, List, ListFilter } from 'lucide-react';
 import { addMinutesToTime } from '../utils/timeUtils';
 import DisplayView from './DisplayView';
+import SpeakerList from '../components/SpeakerList';
+import TimeInput from '../components/TimeInput';
 
 const defaultBackgroundOptions = [
   {
@@ -151,8 +152,21 @@ function AdminView() {
   };
 
   const handleEditSpeaker = (updatedSpeaker: Speaker) => {
+    // Create a clean copy of the speaker without React elements
+    const cleanSpeaker = {
+      id: updatedSpeaker.id,
+      name: updatedSpeaker.name,
+      topic: updatedSpeaker.topic,
+      bio: updatedSpeaker.bio,
+      duration: updatedSpeaker.duration,
+      logo: updatedSpeaker.logo,
+      isBreak: updatedSpeaker.isBreak,
+      order: updatedSpeaker.order,
+      startTime: updatedSpeaker.startTime
+    };
+
     const updatedSpeakers = conference.speakers.map(s => 
-      s.id === updatedSpeaker.id ? updatedSpeaker : s
+      s.id === cleanSpeaker.id ? cleanSpeaker : s
     ).map((speaker, index) => ({
       ...speaker,
       startTime: calculateStartTime(index)
@@ -216,10 +230,23 @@ function AdminView() {
   };
 
   const handleDuplicateSpeaker = (speaker: Speaker) => {
+    // Create a clean copy of the speaker without any React elements
+    const cleanSpeaker = {
+      id: speaker.id,
+      name: speaker.name,
+      topic: speaker.topic,
+      bio: speaker.bio,
+      duration: speaker.duration,
+      logo: speaker.logo,
+      isBreak: speaker.isBreak,
+      order: speaker.order,
+      startTime: speaker.startTime
+    };
+    
     const newSpeaker: Speaker = {
-      ...speaker,
+      ...cleanSpeaker,
       id: crypto.randomUUID(),
-      name: `${speaker.name} (עותק)`,
+      name: `${cleanSpeaker.name} (עותק)`,
       order: conference.speakers.length
     };
     
@@ -387,6 +414,13 @@ function AdminView() {
     createNewConference();
   };
 
+  const handleStartTimeChange = (newStartTime: string) => {
+    setConference(prev => ({
+      ...prev,
+      startTime: newStartTime
+    }));
+  };
+
   return (
     <div 
       className="min-h-screen text-white relative"
@@ -447,16 +481,7 @@ function AdminView() {
             
             <TimeInput
               value={conference.startTime}
-              onChange={(newStartTime) => {
-                setConference(prev => ({
-                  ...prev,
-                  startTime: newStartTime,
-                  speakers: prev.speakers.map((speaker, index) => ({
-                    ...speaker,
-                    startTime: calculateStartTime(index)
-                  }))
-                }));
-              }}
+              onChange={handleStartTimeChange}
               className="bg-black/20 rounded px-4 py-2"
             />
 
@@ -531,7 +556,22 @@ function AdminView() {
             </div>
 
             <SpeakerList
-              speakers={conference.speakers}
+              speakers={conference.speakers.map(speaker => {
+                // Create a clean speaker object without React elements
+                const cleanSpeaker = {
+                  id: speaker.id,
+                  name: speaker.name,
+                  topic: speaker.topic,
+                  bio: speaker.bio,
+                  duration: speaker.duration,
+                  logo: speaker.logo,
+                  isBreak: speaker.isBreak,
+                  order: speaker.order,
+                  startTime: speaker.startTime
+                };
+                
+                return cleanSpeaker;
+              })}
               currentSpeakerId={conference.currentSpeakerId}
               onEdit={handleEditSpeaker}
               onDelete={handleDeleteSpeaker}

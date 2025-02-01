@@ -335,19 +335,48 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     }
   }, [conference]);
 
+  // Add this function before the keyboard shortcuts effect
+  const handleAddMinute = useCallback(() => {
+    if (!conference?.currentSpeakerId) return;
+    
+    const updatedSpeakers = conference.speakers.map(speaker => {
+      if (speaker.id === conference.currentSpeakerId) {
+        return { ...speaker, duration: speaker.duration + 1 };
+      }
+      return speaker;
+    });
+
+    const updatedConference = {
+      ...conference,
+      speakers: updatedSpeakers
+    };
+
+    setConference(updatedConference);
+    localStorage.setItem('conference', JSON.stringify(updatedConference));
+    window.dispatchEvent(new Event('storage'));
+  }, [conference]);
+
   // Keyboard shortcuts for manual mode (next and previous)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (conference?.mode === 'manual') {
-        if (event.ctrlKey && event.shiftKey) {
-          if (event.key.toLowerCase() === 'p') {
-            console.log("Next speaker keyboard shortcut TRIGGERED");
-            event.preventDefault();
+      if (event.ctrlKey && event.shiftKey) {
+        if (event.key.toLowerCase() === 'p') {
+          console.log("Next speaker keyboard shortcut TRIGGERED");
+          event.preventDefault();
+          if (conference?.mode === 'manual') {
             handleManualNextSpeaker();
-          } else if (event.key.toLowerCase() === 'b') {
-            console.log("Previous speaker keyboard shortcut TRIGGERED");
-            event.preventDefault();
+          }
+        } else if (event.key.toLowerCase() === 'b') {
+          console.log("Previous speaker keyboard shortcut TRIGGERED");
+          event.preventDefault();
+          if (conference?.mode === 'manual') {
             handlePreviousSpeaker();
+          }
+        } else if (event.key.toLowerCase() === 'l') {
+          console.log("Add minute keyboard shortcut TRIGGERED");
+          event.preventDefault();
+          if (conference?.currentSpeakerId) {
+            handleAddMinute();
           }
         }
       }
@@ -355,7 +384,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [conference?.mode, handleManualNextSpeaker, handlePreviousSpeaker]);
+  }, [conference?.mode, handleManualNextSpeaker, handlePreviousSpeaker, handleAddMinute, conference?.currentSpeakerId]);
 
   // Update timer for current speaker
   useEffect(() => {
@@ -486,39 +515,24 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     const currentSpeakerIndex = speakers.findIndex(s => s.id === currentSpeakerId);
     if (currentSpeakerIndex === -1) return 0;
     
-    // Calculate remaining time for current speaker
     const currentSpeaker = speakers[currentSpeakerIndex];
-    const currentTimeLeft = getTimeLeftForSpeaker(currentSpeaker);
-    const currentMinutesLeft = Math.floor(currentTimeLeft / 60000);
+    const speakerStartTime = parseTime(speakerTimes.find(st => st.id === currentSpeaker.id)?.startTime || '');
+    
+    // Calculate elapsed time based on current time
+    const now = new Date();
+    const elapsedMinutes = Math.floor((now.getTime() - speakerStartTime.getTime()) / 60000);
 
-    // Add remaining time for all upcoming speakers
+    // Calculate true remaining time
+    // Original duration minus elapsed time, minimum 0
+    const currentMinutesLeft = Math.max(0, currentSpeaker.duration - elapsedMinutes);
+
+    // Add full duration for all upcoming speakers  
     const remainingTime = speakers
       .slice(currentSpeakerIndex + 1)
       .reduce((acc, speaker) => acc + speaker.duration, 0);
 
     return currentMinutesLeft + remainingTime;
-  }, [getTimeLeftForSpeaker]);
-
-  // Add this function before the return statement
-  const handleAddMinute = useCallback(() => {
-    if (!conference?.currentSpeakerId) return;
-    
-    const updatedSpeakers = conference.speakers.map(speaker => {
-      if (speaker.id === conference.currentSpeakerId) {
-        return { ...speaker, duration: speaker.duration + 1 };
-      }
-      return speaker;
-    });
-
-    const updatedConference = {
-      ...conference,
-      speakers: updatedSpeakers
-    };
-
-    setConference(updatedConference);
-    localStorage.setItem('conference', JSON.stringify(updatedConference));
-    window.dispatchEvent(new Event('storage'));
-  }, [conference]);
+  }, [speakerTimes]);
 
   if (!conference) {
     if (isPreview) return null;
@@ -861,11 +875,15 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
           }}
           onNextSpeaker={() => {
             console.log("Next Speaker button CLICKED");
-            handleManualNextSpeaker();
+            if (conference.mode === 'manual') {
+              handleManualNextSpeaker();
+            } else {
+              handleAutomaticNextSpeaker();
+            }
           }}
           totalDuration={conference.speakers.reduce((acc, s) => acc + s.duration, 0)}
           currentProgress={conferenceProgress}
-          canGoNext={!hasConferenceEnded && conference.mode === 'manual' && (() => {
+          canGoNext={!hasConferenceEnded && (() => {
             if (!conference.speakers.length) return false;
             if (!conference.currentSpeakerId) return true;
             const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
@@ -876,7 +894,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
             const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
             return currentIndex > 0;
           })()}
-          onAddMinute={conference.mode === 'manual' && conference.currentSpeakerId ? handleAddMinute : undefined}
+          onAddMinute={conference.currentSpeakerId ? handleAddMinute : undefined}
         />
       </div>
     </div>

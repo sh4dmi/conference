@@ -95,7 +95,7 @@ export default function Footer({
           </div>
 
           {/* Right section: Copyright */}
-          <div className="text-xs text-gray-500">
+          <div className="text-sm text-gray-500">
             כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
           </div>
         </div>
