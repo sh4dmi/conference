@@ -95,6 +95,29 @@ function AdminView() {
     }
   }, [conference]);
 
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('conference');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setConference(parsed);
+        } catch (error) {
+          console.error('Error parsing conference data:', error);
+        }
+      }
+    };
+
+    // Listen for storage events from other tabs
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('conferenceUpdate', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('conferenceUpdate', handleStorageChange);
+    };
+  }, []);
+
   const calculateStartTime = (index: number): string => {
     let currentTime = conference.startTime;
     
@@ -164,6 +187,18 @@ function AdminView() {
     const updatedSpeakers = newSpeakers.map((s, index) => ({
       ...s,
       order: index,
+      startTime: calculateStartTime(index)
+    }));
+
+    setConference(prev => ({
+      ...prev,
+      speakers: updatedSpeakers
+    }));
+  };
+
+  const handleUpdateTimes = () => {
+    const updatedSpeakers = conference.speakers.map((speaker, index) => ({
+      ...speaker,
       startTime: calculateStartTime(index)
     }));
 
@@ -484,6 +519,13 @@ function AdminView() {
                 >
                   <Plus size={20} />
                   <span>הוסף מציג</span>
+                </button>
+                <button
+                  onClick={handleUpdateTimes}
+                  className="flex items-center space-x-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  <Clock size={20} />
+                  <span>עדכן זמנים</span>
                 </button>
               </div>
             </div>

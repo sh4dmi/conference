@@ -112,6 +112,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         speaker,
         timeRange: '',
         timeLeft: 0,
+        timeLeftSeconds: 0,
         elapsedTime: 0,
         isWarning: false,
         isUpcoming: false,
@@ -131,6 +132,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         speaker,
         timeRange: '',
         timeLeft: 0,
+        timeLeftSeconds: 0,
         elapsedTime: 0,
         isWarning: false,
         isUpcoming: false,
@@ -164,6 +166,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
 
     const timeLeftMs = getTimeLeftForSpeaker(speaker);
     const timeLeft = Math.floor(timeLeftMs / 60000);
+    const timeLeftSeconds = Math.floor(timeLeftMs / 1000);
     const isWarning = status === 'current' && timeLeftMs <= (conference.warningTime || 120) * 1000;
 
     // Calculate elapsed time based on start time and current time
@@ -176,6 +179,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
       speaker,
       timeRange: `${timeRangeObj.startTime}-${timeRangeObj.endTime}`,
       timeLeft,
+      timeLeftSeconds,
       elapsedTime,
       isWarning,
       isUpcoming: status === 'upcoming',
@@ -360,10 +364,10 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     
     const currentSpeaker = conference.speakers.find(s => s.id === conference.currentSpeakerId);
     if (!currentSpeaker) return;
-    
+      
     const timeLeft = getTimeLeftForSpeaker(currentSpeaker);
     console.log("Timer useEffect - Time left:", timeLeft, "ms");
-    
+      
     if (timeLeft <= 0) {
       setTimer(prev => ({ ...prev, isRunning: false }));
       // Only switch to next speaker automatically if in automatic mode
@@ -372,9 +376,9 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
         handleAutomaticNextSpeaker();
       } else {
         console.log("Timer useEffect - Time up, but in manual mode, not advancing");
-      }
+        }
       return;
-    }
+      }
 
     const minutes = Math.floor(timeLeft / 60000);
     const seconds = Math.floor((timeLeft % 60000) / 1000);
@@ -494,6 +498,27 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
 
     return currentMinutesLeft + remainingTime;
   }, [getTimeLeftForSpeaker]);
+
+  // Add this function before the return statement
+  const handleAddMinute = useCallback(() => {
+    if (!conference?.currentSpeakerId) return;
+    
+    const updatedSpeakers = conference.speakers.map(speaker => {
+      if (speaker.id === conference.currentSpeakerId) {
+        return { ...speaker, duration: speaker.duration + 1 };
+      }
+      return speaker;
+    });
+
+    const updatedConference = {
+      ...conference,
+      speakers: updatedSpeakers
+    };
+
+    setConference(updatedConference);
+    localStorage.setItem('conference', JSON.stringify(updatedConference));
+    window.dispatchEvent(new Event('storage'));
+  }, [conference]);
 
   if (!conference) {
     if (isPreview) return null;
@@ -680,10 +705,12 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                     const now = new Date();
                     const startTimeDate = parseTime(speakerToShow.timeRangeObj?.startTime || '');
                     const elapsedMs = now.getTime() - startTimeDate.getTime();
-                    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
-                    const duration = Math.max(0, speakerToShow.speaker.duration);
-                    const exceededMinutes = Math.max(0, elapsedMinutes - duration);
-                    const isExceeded = exceededMinutes > 0 || speakerToShow.speaker.duration < 0;
+                    const elapsedSeconds = Math.floor(elapsedMs / 1000);
+                    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+                    const duration = Math.max(0, speakerToShow.speaker.duration * 60); // Convert to seconds 
+                    const exceededSeconds = Math.max(0, elapsedSeconds - duration);
+                    const exceededMinutes = Math.floor(exceededSeconds / 60);
+                    const isExceeded = exceededSeconds > 0 || speakerToShow.speaker.duration < 0;
                     
                     return (
                       <div className={`p-12 rounded-lg transition-all duration-300 backdrop-blur-md ${
@@ -734,7 +761,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                                           : 'bg-gradient-to-r from-blue-500 to-blue-600'
                                     }`}
                                     style={{ 
-                                      width: `${Math.min(100, (elapsedMinutes / duration) * 100)}%`
+                                      width: `${Math.min(100, (elapsedMinutes / speakerToShow.speaker.duration) * 100)}%`
                                     }} 
                                   />
                                 </div>
@@ -749,11 +776,18 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                                           <span className="text-red-400 font-bold text-3xl">חריגה:</span>
                                           <div className="relative">
                                             <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-red-600 rounded-md opacity-25 blur-sm"></div>
-                                            <span className="relative text-red-300 font-mono text-5xl bg-black/60 px-4 py-2 rounded-md block">
-                                              {speakerToShow.speaker.duration < 0 ? elapsedMinutes : exceededMinutes}
+                                            <span className="relative text-red-300 text-5xl bg-black/60 px-4 py-2 rounded-md block">
+                                              {exceededMinutes < 1 ? (
+                                                <>
+                                                  חרג ב-{exceededSeconds} {exceededSeconds === 1 ? 'שנייה' : 'שניות'}  
+                                                </>
+                                              ) : (
+                                                <>
+                                                  חרג ב-{exceededMinutes} {exceededMinutes === 1 ? 'דקה' : 'דקות'}
+                                                </>  
+                                              )}
                                             </span>
                                           </div>
-                                          <span className="text-red-400 text-3xl">דקות</span>
                                         </div>
                                         <div className="flex items-center gap-3">
                                           <span className="text-xl text-blue-300/90">חלפו</span>
@@ -773,10 +807,10 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                                   if (speakerToShow.isUpcoming) {
                                     return (
                                       <div className="relative w-full">
-                                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
                                         <p className="relative text-2xl text-blue-100 bg-black/40 rounded-md px-6 py-4">
-                                          מתחיל בעוד {speakerToShow.timeLeft} דקות
-                                        </p>
+                                        מתחיל בעוד {speakerToShow.timeLeft} דקות
+                                      </p>
                                       </div>
                                     );
                                   }
@@ -784,20 +818,23 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                                   // Default case
                                   return (
                                     <div className="flex items-center justify-between w-full bg-black/40 rounded-md px-6 py-4">
-                                      <p className={`text-2xl tracking-wide ${
+                                        <p className={`text-2xl tracking-wide ${
                                         speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-blue-100'
-                                      }`}>
-                                        נותרו {Math.max(0, duration - elapsedMinutes)} דקות
-                                      </p>
+                                        }`}>
+                                        {duration - elapsedSeconds <= 60 ? (
+                                          <>נגמר בעוד {duration - elapsedSeconds} שניות</>
+                                        ) : (
+                                          <>נותרו {speakerToShow.timeLeft} דקות</>
+                                        )}
+                                        </p>
                                       <div className="flex items-center gap-3">
-                                        <span className="text-xl text-blue-300/90">חלפו</span>
+                                        <span className="text-xl text-blue-300/90">דקות שחלפו</span>
                                         <div className="relative">
                                           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
                                           <span className="relative text-3xl text-blue-200 font-mono bg-black/60 px-4 py-2 rounded-md block">
                                             {elapsedMinutes}
                                           </span>
                                         </div>
-                                        <span className="text-xl text-blue-300/90">דקות</span>
                                       </div>
                                     </div>
                                   );
@@ -839,6 +876,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
             const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
             return currentIndex > 0;
           })()}
+          onAddMinute={conference.mode === 'manual' && conference.currentSpeakerId ? handleAddMinute : undefined}
         />
       </div>
     </div>

@@ -9,6 +9,7 @@ interface FooterProps {
   currentProgress: number;
   canGoNext: boolean;
   canGoPrev: boolean;
+  onAddMinute?: () => void;
 }
 
 export default function Footer({
@@ -19,6 +20,7 @@ export default function Footer({
   currentProgress,
   canGoNext,
   canGoPrev,
+  onAddMinute
 }: FooterProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-black/60 backdrop-blur-lg border-t border-white/10">
@@ -70,6 +72,16 @@ export default function Footer({
                 <ArrowLeft size={18} />
               </button>
             </div>
+
+            {/* Add minute button */}
+            {onAddMinute && (
+              <button
+                onClick={onAddMinute}
+                className="ml-4 px-5 py-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded-lg text-sm font-medium transition-colors border border-blue-500/30"
+              >
+                +1 דקה
+              </button>
+            )}
           </div>
 
           {/* Center section: Time remaining */}
