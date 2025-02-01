@@ -122,7 +122,7 @@ export default function SpeakerList({
               status === 'current' ? 'bg-blue-400 w-3 h-3 ring-4 ring-blue-400/30' : 
               'bg-gray-600'
             }`} />
-            
+
             {/* Progress line */}
             {status === 'current' && speaker.startTime && (
               <div className="absolute left-2 -bottom-2 top-1/2 w-0.5 bg-blue-400 transform -translate-x-1/2" />
@@ -213,11 +213,11 @@ export default function SpeakerList({
                 {!speaker.isBreak && (
                   <div className="flex items-center space-x-2">
                     {speaker.logo && (
-                      <img
-                        src={`/logos/${speaker.logo}`}
-                        alt={`${speaker.name} logo`}
+                        <img
+                          src={`/logos/${speaker.logo}`}
+                          alt={`${speaker.name} logo`}
                         className="h-6 w-6 object-contain"
-                      />
+                        />
                     )}
                     <h3 className="font-semibold text-lg text-white">{speaker.name}</h3>
                   </div>
@@ -233,40 +233,40 @@ export default function SpeakerList({
                 <p className="text-gray-300 mt-2">{speaker.topic}</p>
                 <div className="flex items-center space-x-2 mt-1 text-sm text-gray-400">
                   <Clock size={14} />
-                  <span>{speaker.duration} דקות</span>
-                  {speaker.startTime && (
-                    <>
+                      <span>{speaker.duration} דקות</span>
+                    {speaker.startTime && (
+                      <>
                       <span className="mx-1">|</span>
                       <span>{speaker.startTime}</span>
-                    </>
-                  )}
+                      </>
+                    )}
                 </div>
               </div>
             )}
             <div className="flex items-center space-x-2">
               {!editingSpeaker && (
                 <>
-                  <button
-                    onClick={() => handleEditClick(speaker)}
+              <button
+                onClick={() => handleEditClick(speaker)}
                     className="p-1 hover:bg-white/20 rounded transition-colors"
                     title="ערוך"
-                  >
+              >
                     <Edit size={20} className="text-blue-400" />
-                  </button>
-                  <button
+              </button>
+              <button
                     onClick={() => onDuplicate(speaker)}
                     className="p-1 hover:bg-white/20 rounded transition-colors"
                     title="שכפל"
-                  >
+              >
                     <Copy size={20} className="text-purple-400" />
-                  </button>
-                  <button
+              </button>
+              <button
                     onClick={() => onDelete(speaker.id)}
                     className="p-1 hover:bg-white/20 rounded transition-colors"
                     title="מחק"
-                  >
+              >
                     <Trash2 size={20} className="text-red-400" />
-                  </button>
+              </button>
                 </>
               )}
             </div>

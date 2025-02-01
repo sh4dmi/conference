@@ -13,6 +13,7 @@ import {
   parseTime,
   SpeakerTime
 } from '../utils/timeUtils';
+import Footer from '../components/Footer';
 
 interface DisplayViewProps {
   isPreview?: boolean;
@@ -415,63 +416,6 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
     return speakerInfos;
   }, [conference?.speakers, conference?.showUpcomingOnly, getSpeakerInfo]);
 
-  // Function to shorten current speaker's time
-  const handleShortenSpeakerTime = useCallback((speaker: Speaker | undefined) => {
-    if (!conference || !speaker) return;
-
-    const speakerStartTime = speakerTimes.find(st => st.id === speaker.id)?.startTime;
-    if (!speakerStartTime) return;
-
-    const startTimeDate = parseTime(speakerStartTime);
-    const now = new Date();
-    const elapsedTimeMinutes = Math.ceil((now.getTime() - startTimeDate.getTime()) / (1000 * 60));
-    // Set duration to elapsed time minus 1 minute
-    const newDuration = Math.max(1, elapsedTimeMinutes - 1);
-
-    const updatedSpeakers = conference.speakers.map(s => {
-      if (s.id === speaker.id) {
-        return { ...s, duration: newDuration };
-      }
-      return s;
-    });
-
-    // Calculate new speaker times immediately
-    const newSpeakerTimes = calculateSpeakerTimes(updatedSpeakers, conference.startTime);
-
-    const updatedConference = {
-      ...conference,
-      speakers: updatedSpeakers
-    };
-
-    // Update both state and localStorage synchronously
-    localStorage.setItem('conference', JSON.stringify(updatedConference));
-    setConference(updatedConference);
-    setSpeakerTimes(newSpeakerTimes);
-
-  }, [conference, speakerTimes]);
-
-  // Add keyboard shortcut handler
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Check if Ctrl+Shift+P is pressed
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'p') {
-        event.preventDefault(); // Prevent default browser behavior
-        
-        // Find current speaker
-        const currentSpeaker = displayedSpeakers.find(info => 
-          !info.isFinished && !info.isUpcoming
-        );
-        
-        if (currentSpeaker?.speaker) {
-          handleShortenSpeakerTime(currentSpeaker.speaker);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [displayedSpeakers, handleShortenSpeakerTime]);
-
   // Function to check if conference has ended
   const hasConferenceEnded = React.useMemo(() => {
     if (!conference?.speakers?.length) return false;
@@ -494,50 +438,50 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
   // Update the progress calculation to be based on speaker order
   const conferenceProgress = React.useMemo(() => {
     if (!conference?.speakers?.length || !speakerTimes.length) return 0;
-    
+
     const totalDuration = conference.speakers.reduce((acc, s) => acc + s.duration, 0);
     
     // Find the current speaker's index
     const currentSpeakerIndex = conference.speakers.findIndex(s => {
       const speakerTime = speakerTimes.find(st => st.id === s.id);
       if (!speakerTime) return false;
-      
+    
       const timeRangeObj: TimeRange = {
         startTime: speakerTime.startTime,
         endTime: speakerTime.endTime,
         duration: speakerTime.duration
       };
-      
+
       return getTimeStatus(timeRangeObj) === 'current';
     });
-
+    
     if (currentSpeakerIndex === -1) return 0;
     
     // Calculate progress based on completed speakers plus current speaker progress
     const completedDuration = conference.speakers
       .slice(0, currentSpeakerIndex)
       .reduce((acc, s) => acc + s.duration, 0);
-      
+    
     const currentSpeaker = conference.speakers[currentSpeakerIndex];
     const currentSpeakerTime = speakerTimes.find(st => st.id === currentSpeaker.id);
     
     if (!currentSpeakerTime) return (completedDuration / totalDuration) * 100;
-    
+
     const timeLeft = getTimeLeftForSpeaker(currentSpeaker);
     const currentProgress = currentSpeaker.duration - (timeLeft / 60000);
-    
+
     const progress = ((completedDuration + currentProgress) / totalDuration) * 100;
-    
+
     return Math.min(100, Math.max(0, progress));
   }, [conference?.speakers, currentTime, speakerTimes, getTimeLeftForSpeaker]);
-
+    
   // Add this function at the top with other utility functions
   const getTotalRemainingConferenceTime = useCallback((speakers: Speaker[], currentSpeakerId: string | null): number => {
     if (!speakers.length) return 0;
-    
+
     const currentSpeakerIndex = speakers.findIndex(s => s.id === currentSpeakerId);
     if (currentSpeakerIndex === -1) return 0;
-
+    
     // Calculate remaining time for current speaker
     const currentSpeaker = speakers[currentSpeakerIndex];
     const currentTimeLeft = getTimeLeftForSpeaker(currentSpeaker);
@@ -648,19 +592,6 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                   scrollbarWidth: 'thin',
                   scrollbarColor: 'rgba(255,255,255,0.3) transparent'
                 }}>
-                {/* Timeline with gradient - Only show when not in upcoming mode */}
-                {!conference.showUpcomingOnly && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-700/30 rounded-full overflow-hidden">
-                    <div 
-                      className="w-full bg-gradient-to-b from-blue-400 to-blue-600 transition-all duration-1000 rounded-full"
-                      style={{ 
-                        height: `${conferenceProgress}%`,
-                        maxHeight: '100%'
-                      }} 
-                    />
-                  </div>
-                )}
-                
                 {/* Updated speaker cards with better contrast and glow effect for current speaker */}
                 {displayedSpeakers.map((speakerInfo: SpeakerInfo) => {
                   if (!speakerInfo.speaker) return null;
@@ -668,42 +599,48 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                   return (
                     <div
                       key={speakerInfo.speaker.id}
-                      className={`relative bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-500 ${
+                      className={`relative backdrop-blur-md rounded-lg p-6 transition-all duration-300 ${
                         isCurrent
-                          ? 'ring-2 ring-blue-400 bg-blue-900/20 shadow-[0_0_30px_rgba(59,130,246,0.5)] animate-pulse-slow border border-blue-400/50'
-                          : 'hover:bg-white/20'
+                          ? 'bg-gradient-to-r from-blue-600/40 to-blue-400/30 shadow-lg shadow-blue-500/20'
+                          : 'bg-black/60 hover:bg-black/70'
                       }`}
                     >
-                      <div className={`space-y-2 ${isCurrent ? 'relative z-10' : ''}`}>
-                        <div className="flex items-center gap-3">
+                      <div className={`space-y-3 ${isCurrent ? 'relative z-10' : ''}`}>
+                        <div className="flex items-center gap-4">
                           {speakerInfo.speaker.logo && (
                             <img src={`/logos/${speakerInfo.speaker.logo}`}
                               alt={`${speakerInfo.speaker.name} logo`}
-                              className={`w-12 h-12 object-contain rounded-full bg-white/20 p-1 ${
-                                isCurrent ? 'ring-1 ring-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : ''
+                              className={`w-16 h-16 object-contain rounded-md bg-black/40 p-2 transition-transform duration-300 ${
+                                isCurrent ? 'ring-1 ring-blue-400/50' : ''
                               }`} />
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className={`text-lg font-bold truncate ${
-                              isCurrent ? 'text-blue-100 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-white'
+                            <h3 className={`text-xl font-bold truncate ${
+                              isCurrent ? 'text-white' : 'text-white/90'
                             }`}>{speakerInfo.speaker.name}</h3>
                             {speakerInfo.speaker.bio && (
-                              <p className="text-sm text-gray-200 truncate italic">{speakerInfo.speaker.bio}</p>
+                              <p className="text-base text-blue-100/70 truncate italic">{speakerInfo.speaker.bio}</p>
                             )}
-                            <p className={`text-sm truncate ${
-                              isCurrent ? 'text-blue-300' : 'text-blue-200'
+                            <p className={`text-base truncate mt-1 ${
+                              isCurrent ? 'text-blue-200' : 'text-blue-200/70'
                             }`}>{speakerInfo.speaker.topic}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className={`text-sm font-mono font-semibold ${
-                            isCurrent ? 'text-blue-100' : 'text-blue-100'
-                          }`}>{speakerInfo.timeRange}</span>
+                          {(() => {
+                            if (speakerInfo.timeRangeObj?.endTime) {
+                              return (
+                                <span className={`inline-block px-3 py-1 rounded-md font-mono text-base ${
+                                  isCurrent 
+                                    ? 'bg-blue-500/20 text-blue-100' 
+                                    : 'bg-black/40 text-gray-300'
+                                }`}>{speakerInfo.timeRange}</span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
-                      {isCurrent && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-blue-400/10 rounded-xl" />
-                      )}
                     </div>
                   );
                 })}
@@ -738,90 +675,135 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                     const speakerToShow = currentSpeaker || nextSpeaker || displayedSpeakers[displayedSpeakers.length - 1];
                     
                     if (!speakerToShow?.speaker) return null;
+
+                    // Calculate time info outside the nested IIFE for reuse
+                    const now = new Date();
+                    const startTimeDate = parseTime(speakerToShow.timeRangeObj?.startTime || '');
+                    const elapsedMs = now.getTime() - startTimeDate.getTime();
+                    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+                    const duration = Math.max(0, speakerToShow.speaker.duration);
+                    const exceededMinutes = Math.max(0, elapsedMinutes - duration);
+                    const isExceeded = exceededMinutes > 0 || speakerToShow.speaker.duration < 0;
                     
                     return (
-                      <div className={`p-16 rounded-2xl transition-all duration-500 backdrop-blur-sm shadow-2xl ${
-                        speakerToShow.isWarning
-                          ? 'bg-red-900/30 border-2 border-red-400 animate-pulse'
-                          : speakerToShow.speaker.isBreak 
-                            ? 'bg-green-900/30 border border-green-400'
-                            : 'bg-white/10 border border-white/20'
+                      <div className={`p-12 rounded-lg transition-all duration-300 backdrop-blur-md ${
+                        isExceeded && conference.mode === 'manual'
+                          ? 'bg-black/70 shadow-lg shadow-red-500/20'
+                          : speakerToShow.isWarning
+                            ? 'bg-black/70 shadow-lg shadow-red-500/20 animate-pulse'
+                            : speakerToShow.speaker.isBreak 
+                              ? 'bg-black/70 shadow-lg shadow-green-500/20'
+                              : 'bg-black/60 shadow-lg shadow-blue-500/10'
                       }`}>
                         <div className="flex items-center gap-12">
                           {speakerToShow.speaker.logo && (
-                            <img src={`/logos/${speakerToShow.speaker.logo}`}
-                              alt={`${speakerToShow.speaker.name} logo`}
-                              className="w-52 h-52 object-contain rounded-2xl bg-white/10 p-4 shadow-lg shadow-black/50 border border-white/10" />
+                            <div className="relative group">
+                              <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg opacity-25 group-hover:opacity-40 blur-sm transition duration-300"></div>
+                              <div className="relative">
+                                <img src={`/logos/${speakerToShow.speaker.logo}`}
+                                  alt={`${speakerToShow.speaker.name} logo`}
+                                  className="w-48 h-48 object-contain rounded-lg bg-black/60 p-6 shadow-lg transition-transform duration-300 group-hover:scale-105" />
+                              </div>
+                            </div>
                           )}
                           <div className="flex-1">
-                            <h2 className="text-8xl font-bold mb-8 tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-200 drop-shadow-lg">
+                            <h2 className="text-6xl font-bold mb-6 tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-100 to-blue-200">
                               {speakerToShow.speaker.name}
                             </h2>
                             {speakerToShow.speaker.bio && (
-                              <p className="text-3xl text-gray-300 mb-8 leading-relaxed font-light">
+                              <p className="text-2xl text-blue-100/80 mb-6 leading-relaxed font-light">
                                 {speakerToShow.speaker.bio}
                               </p>
                             )}
-                            <p className="text-5xl text-blue-200 mb-10 font-medium tracking-wide">
+                            <p className="text-4xl text-blue-200/90 mb-8 font-medium tracking-wide">
                               {speakerToShow.speaker.topic}
                             </p>
-                            <div className="flex items-center gap-8">
-                              <span className="text-4xl font-mono text-blue-100 font-semibold tracking-wider">
-                                {speakerToShow.timeRange}
-                              </span>
-                              {speakerToShow.timeLeft && !speakerToShow.isFinished && (
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-center mb-3">
-                                    <p className={`text-2xl tracking-wide ${
-                                      speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-gray-300'
-                                    }`}>
-                                      {speakerToShow.timeLeft !== undefined
-                                        ? speakerToShow.isUpcoming 
-                                          ? `מתחיל בעוד ${speakerToShow.timeLeft} דקות`
-                                          : (() => {
-                                              const now = new Date();
-                                              const endTimeStr = speakerToShow.timeRangeObj?.endTime;
-                                              if (!endTimeStr) return '';
-                                              
-                                              const [hours, minutes] = endTimeStr.split(':').map(Number);
-                                              const endTime = new Date();
-                                              endTime.setHours(hours, minutes, 0, 0);
-                                              
-                                              if (now > endTime) {
-                                                const diffMs = now.getTime() - endTime.getTime();
-                                                const diffMinutes = Math.ceil(diffMs / (1000 * 60));
-                                                return `הזמן חלף ב-${diffMinutes} דק`;
-                                              }
-                                              
-                                              return `נותרו ${speakerToShow.timeLeft} דקות`;
-                                            })()
-                                        : ''
-                                      }
-                                    </p>
-                                    {!speakerToShow.isUpcoming && (
-                                      <p className="text-2xl text-blue-300">
-                                        {Math.floor((speakerToShow.speaker.duration - Math.max(speakerToShow.timeLeft, 0)) / 1)} דקות חלפו
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="w-full h-3 bg-black/50 rounded-full overflow-hidden shadow-inner">
-                                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-1000"
-                                      style={{ 
-                                        width: `${((speakerToShow.speaker.duration - Math.max(speakerToShow.timeLeft, 0)) / speakerToShow.speaker.duration) * 100}%`
-                                      }} />
-                                  </div>
+                            <div className="space-y-6">
+                              <div className="flex items-center gap-6">
+                                <span className="text-3xl font-mono text-blue-100/90 font-semibold tracking-wider px-4 py-2 rounded-md bg-black/40">
+                                  {speakerToShow.timeRange}
+                                </span>
+                                {/* Progress bar container */}
+                                <div className="flex-1 h-2 bg-black/40 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full transition-all duration-300 ${
+                                      isExceeded 
+                                        ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                        : speakerToShow.isWarning
+                                          ? 'bg-gradient-to-r from-yellow-500 to-red-500'
+                                          : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                                    }`}
+                                    style={{ 
+                                      width: `${Math.min(100, (elapsedMinutes / duration) * 100)}%`
+                                    }} 
+                                  />
                                 </div>
-                              )}
+                              </div>
+                              <div className="flex justify-between items-center">
+                                {(() => {
+                                  // If in manual mode and speaker has exceeded time
+                                  if (conference.mode === 'manual' && !speakerToShow.isUpcoming && isExceeded) {
+                                    return (
+                                      <div className="flex items-center justify-between w-full bg-black/40 rounded-md px-6 py-4">
+                                        <div className="flex items-center gap-4">
+                                          <span className="text-red-400 font-bold text-3xl">חריגה:</span>
+                                          <div className="relative">
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-red-600 rounded-md opacity-25 blur-sm"></div>
+                                            <span className="relative text-red-300 font-mono text-5xl bg-black/60 px-4 py-2 rounded-md block">
+                                              {speakerToShow.speaker.duration < 0 ? elapsedMinutes : exceededMinutes}
+                                            </span>
+                                          </div>
+                                          <span className="text-red-400 text-3xl">דקות</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xl text-blue-300/90">חלפו</span>
+                                          <div className="relative">
+                                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
+                                            <span className="relative text-3xl text-blue-200 font-mono bg-black/60 px-4 py-2 rounded-md block">
+                                              {elapsedMinutes}
+                                            </span>
+                                          </div>
+                                          <span className="text-xl text-blue-300/90">דקות</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  // If upcoming
+                                  if (speakerToShow.isUpcoming) {
+                                    return (
+                                      <div className="relative w-full">
+                                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
+                                        <p className="relative text-2xl text-blue-100 bg-black/40 rounded-md px-6 py-4">
+                                          מתחיל בעוד {speakerToShow.timeLeft} דקות
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Default case
+                                  return (
+                                    <div className="flex items-center justify-between w-full bg-black/40 rounded-md px-6 py-4">
+                                      <p className={`text-2xl tracking-wide ${
+                                        speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-blue-100'
+                                      }`}>
+                                        נותרו {Math.max(0, duration - elapsedMinutes)} דקות
+                                      </p>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xl text-blue-300/90">חלפו</span>
+                                        <div className="relative">
+                                          <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md opacity-20 blur-sm"></div>
+                                          <span className="relative text-3xl text-blue-200 font-mono bg-black/60 px-4 py-2 rounded-md block">
+                                            {elapsedMinutes}
+                                          </span>
+                                        </div>
+                                        <span className="text-xl text-blue-300/90">דקות</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                             </div>
-                            {!speakerToShow.isUpcoming && !speakerToShow.isFinished && (
-                              <button
-                                onClick={() => handleShortenSpeakerTime(speakerToShow.speaker)}
-                                className="mt-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-colors flex items-center gap-2 text-lg"
-                              >
-                                <Clock size={20} />
-                                קיצור זמן מציג
-                              </button>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -833,57 +815,31 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
           </div>
         </div>
 
-        {/* Footer section with ticker and disclaimer */}
-        <div className="mt-auto">
-          {/* Ticker Bar */}
-          <div className="bg-black/30 backdrop-blur-[8px] p-3 text-center">
-            <p className="text-lg text-blue-200">
-              {displayedSpeakers.length > 0 && displayedSpeakers[0].timeLeft !== undefined
-                ? hasConferenceEnded
-                  ? 'תודה שהשתתפתם בכנס'
-                  : displayedSpeakers[0].isUpcoming 
-                    ? `הכנס יתחיל בעוד ${displayedSpeakers[0].timeLeft} דקות` 
-                    : `נותרו ${getTotalRemainingConferenceTime(conference.speakers, conference.currentSpeakerId)} דקות עד סוף הכנס`
-                : ''
-              }
-            </p>
-          </div>
-        </div>
-
-        {/* Disclaimer */}
-        <div className="absolute bottom-4 right-4 text-sm text-white/50 z-50">
-          כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
-        </div>
-
-        {/* Manual Mode Buttons */}
-        {conference?.mode === 'manual' && !hasConferenceEnded && (
-          <div className="fixed bottom-16 left-4 flex flex-col gap-2 z-50">
-            {/* Previous Speaker Button */}
-            <button
-              onClick={() => {
-                console.log("Previous Speaker button CLICKED");
-                handlePreviousSpeaker();
-              }}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2 text-lg font-medium"
-              style={{ transform: 'scaleX(-1)' }} // Flip the arrow horizontally
-            >
-              <ArrowLeft size={20} />
-              <span style={{ transform: 'scaleX(-1)' }}>מציג קודם</span>
-            </button>
-            
-            {/* Next Speaker Button */}
-            <button
-              onClick={() => {
-                console.log("Next Speaker button CLICKED");
-                handleManualNextSpeaker();
-              }}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 text-lg font-medium"
-            >
-              <span>מציג הבא</span>
-              <ArrowLeft size={20} />
-            </button>
-          </div>
-        )}
+        {/* Remove old footer elements and use the new Footer component */}
+        <Footer
+          timeLeft={getTotalRemainingConferenceTime(conference.speakers, conference.currentSpeakerId)}
+          onPrevSpeaker={() => {
+            console.log("Previous Speaker button CLICKED");
+            handlePreviousSpeaker();
+          }}
+          onNextSpeaker={() => {
+            console.log("Next Speaker button CLICKED");
+            handleManualNextSpeaker();
+          }}
+          totalDuration={conference.speakers.reduce((acc, s) => acc + s.duration, 0)}
+          currentProgress={conferenceProgress}
+          canGoNext={!hasConferenceEnded && conference.mode === 'manual' && (() => {
+            if (!conference.speakers.length) return false;
+            if (!conference.currentSpeakerId) return true;
+            const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+            return currentIndex < conference.speakers.length - 1;
+          })()}
+          canGoPrev={conference.mode === 'manual' && (() => {
+            if (!conference.currentSpeakerId || !conference.speakers.length) return false;
+            const currentIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+            return currentIndex > 0;
+          })()}
+        />
       </div>
     </div>
   );
