@@ -19,6 +19,39 @@ interface DisplayViewProps {
   isPreview?: boolean;
 }
 
+// Function to manually proceed to the next speaker without rearranging times
+export const handleManualNextSpeakerNoTimeChange = (conference: Conference | null, setConference: React.Dispatch<React.SetStateAction<Conference | null>>) => {
+  console.log("handleManualNextSpeakerNoTimeChange CALLED, mode:", conference?.mode);
+  if (!conference || conference.mode !== 'manual') {
+    console.log("handleManualNextSpeakerNoTimeChange - Not in manual mode or conference is null, returning");
+    return;
+  }
+
+  const currentSpeakerIndex = conference.speakers.findIndex(s => s.id === conference.currentSpeakerId);
+  const nextSpeakerIndex = currentSpeakerIndex + 1;
+  console.log("handleManualNextSpeakerNoTimeChange - Current index:", currentSpeakerIndex, "Next index:", nextSpeakerIndex);
+
+  if (nextSpeakerIndex < conference.speakers.length) {
+    console.log("handleManualNextSpeakerNoTimeChange - Advancing to next speaker");
+    const updatedConference = {
+      ...conference,
+      currentSpeakerId: conference.speakers[nextSpeakerIndex].id
+    };
+    setConference(updatedConference);
+    localStorage.setItem('conference', JSON.stringify(updatedConference));
+    window.dispatchEvent(new Event('storage'));
+  } else {
+    console.log("handleManualNextSpeakerNoTimeChange - No more speakers, ending conference");
+    const updatedConference = {
+      ...conference,
+      currentSpeakerId: null
+    };
+    setConference(updatedConference);
+    localStorage.setItem('conference', JSON.stringify(updatedConference));
+    window.dispatchEvent(new Event('storage'));
+  }
+};
+
 function DisplayView({ isPreview = false }: DisplayViewProps) {
   const [conference, setConference] = useState<Conference | null>(() => {
     const saved = localStorage.getItem('conference');
@@ -886,13 +919,17 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
             console.log("Previous Speaker button CLICKED");
             handlePreviousSpeaker();
           }}
+          onPrevSpeakerNoTimeChange={() => {
+            console.log("Previous Speaker (No Time Change) button CLICKED");
+            handlePreviousSpeaker();
+          }}
           onNextSpeaker={() => {
             console.log("Next Speaker button CLICKED");
-            if (conference.mode === 'manual') {
-              handleManualNextSpeaker();
-            } else {
-              handleAutomaticNextSpeaker();
-            }
+            handleManualNextSpeaker();
+          }}
+          onNextSpeakerNoTimeChange={() => {
+            console.log("Next Speaker (No Time Change) button CLICKED");
+            handleManualNextSpeakerNoTimeChange(conference, setConference);
           }}
           totalDuration={conference.speakers.reduce((acc, s) => acc + s.duration, 0)}
           currentProgress={conferenceProgress}

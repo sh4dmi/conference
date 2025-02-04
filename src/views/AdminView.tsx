@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Conference, Speaker } from '../types';
 import { TimeRange } from '../types/SpeakerInfo';
-import { Plus, Calendar, Clock, Image, ArrowLeft, Coffee, Video, List, ListFilter } from 'lucide-react';
+import { Plus, Calendar, Clock, Image, ArrowLeft, Coffee, Video, List, ListFilter, ArrowRight } from 'lucide-react';
 import { addMinutesToTime } from '../utils/timeUtils';
-import DisplayView from './DisplayView';
+import DisplayView, { handleManualNextSpeakerNoTimeChange } from './DisplayView';
 import SpeakerList from '../components/SpeakerList';
 import TimeInput from '../components/TimeInput';
 
@@ -556,6 +556,18 @@ function AdminView() {
                   <Clock size={20} />
                   <span>עדכן זמנים</span>
                 </button>
+                {conference.mode === 'manual' && (
+                  <button
+                    onClick={() => {
+                      console.log("Next Speaker (No Time Change) button CLICKED");
+                      handleManualNextSpeakerNoTimeChange(conference, setConference);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <ArrowRight size={20} />
+                    <span>הבא (ללא שינוי זמן)</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -582,6 +594,7 @@ function AdminView() {
               onReorder={handleReorderSpeakers}
               onDuplicate={handleDuplicateSpeaker}
               showUpcomingOnly={conference.showUpcomingOnly}
+              onSetCurrentSpeaker={handleSetCurrentSpeaker}
             />
           </section>
 

@@ -4,7 +4,9 @@ import { ArrowLeft, ArrowRight, Timer } from 'lucide-react';
 interface FooterProps {
   timeLeft: number;
   onPrevSpeaker: () => void;
+  onPrevSpeakerNoTimeChange: () => void;
   onNextSpeaker: () => void;
+  onNextSpeakerNoTimeChange: () => void;
   totalDuration: number;
   currentProgress: number;
   canGoNext: boolean;
@@ -15,7 +17,9 @@ interface FooterProps {
 export default function Footer({
   timeLeft,
   onPrevSpeaker,
+  onPrevSpeakerNoTimeChange,
   onNextSpeaker,
+  onNextSpeakerNoTimeChange,
   totalDuration,
   currentProgress,
   canGoNext,
@@ -69,6 +73,24 @@ export default function Footer({
                 `}
               >
                 <span>מציג הבא</span>
+                <ArrowLeft size={18} />
+              </button>
+
+              <div className="w-px h-8 bg-white/10 mx-1" />
+
+              <button
+                onClick={onNextSpeakerNoTimeChange}
+                disabled={!canGoNext}
+                className={`
+                  flex items-center space-x-2 px-5 py-3 rounded-lg text-sm font-medium
+                  transition-all duration-200
+                  ${canGoNext
+                    ? 'bg-white/10 hover:bg-white/20 text-white hover:scale-105'
+                    : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                  }
+                `}
+              >
+                <span>מציג הבא (ללא שינוי זמן)</span>
                 <ArrowLeft size={18} />
               </button>
             </div>
