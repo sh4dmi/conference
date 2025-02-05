@@ -107,18 +107,20 @@ export default function Footer({
           </div>
 
           {/* Center section: Time remaining */}
-          <div className="flex items-center">
-            <div className="flex items-center space-x-2 bg-white/5 px-5 py-3 rounded-lg">
-              <Timer size={18} className="text-blue-400" />
-              <span className="text-sm font-medium text-gray-300">
+          <div className="flex items-center mx-4">
+            <div className="flex items-center gap-2 bg-white/5 px-5 py-3 rounded-lg whitespace-nowrap">
+              <Timer size={20} className="text-blue-400" />
+              <span className="text-lg font-medium text-gray-300 ml-1">
                 נותרו {timeLeft} דקות עד סוף הכנס
               </span>
             </div>
           </div>
 
           {/* Right section: Copyright */}
-          <div className="text-sm text-gray-500">
-            כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
+          <div className="flex items-center">
+            <p className="text-3xl font-bold text-white whitespace-nowrap">
+              כל הזכויות שמורות לענף תקשוב ודיגיטל אכ"א
+            </p>
           </div>
         </div>
       </div>

@@ -807,7 +807,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                             </p>
                             <div className="space-y-6">
                               <div className="flex items-center gap-6">
-                                <span className="text-3xl font-mono text-blue-100/90 font-semibold tracking-wider px-4 py-2 rounded-md bg-black/40">
+                                <span className="text-6xl font-mono text-blue-100/90 font-semibold tracking-wider px-4 py-2 rounded-md bg-black/40">
                                   {speakerToShow.timeRange}
                                 </span>
                                 {/* Progress bar container */}
@@ -878,7 +878,7 @@ function DisplayView({ isPreview = false }: DisplayViewProps) {
                                   // Default case
                                   return (
                                     <div className="flex items-center justify-between w-full bg-black/40 rounded-md px-6 py-4">
-                                        <p className={`text-2xl tracking-wide ${
+                                        <p className={`text-5xl tracking-wide ${
                                         speakerToShow.isWarning ? 'text-red-400 font-semibold' : 'text-blue-100'
                                         }`}>
                                         {duration - elapsedSeconds <= 60 ? (
